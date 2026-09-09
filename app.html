@@ -1637,6 +1637,7 @@
           </div>
           <div style="display: flex; align-items: center; gap: 8px;">
             <div style="font-size: 18px; font-weight: 900; color: var(--success-green); background: rgba(76,175,80,0.15); padding: 4px 10px; border-radius: 8px; border: 1px solid rgba(76,175,80,0.3);" id="activeTimer">00:00</div>
+            <button onclick="finishActiveWorkout()" class="btn btn-success" style="width: auto; padding: 6px 12px; font-size: 12px; font-weight: 800; border-radius: 8px; box-shadow: 0 2px 10px rgba(76,175,80,0.3);">✓ Concluir</button>
           </div>
         </div>
 
@@ -1856,7 +1857,7 @@
             📅 Calendário
           </button>
           <button id="historyTabChartsBtn" onclick="switchHistorySubTab('charts')" style="flex: 1; padding: 8px 4px; border-radius: 9px; border: none; font-size: 11.5px; font-weight: 800; cursor: pointer; background: transparent; color: var(--text-grey); transition: all 0.2s;">
-            📈 Gráficos
+            📈 Evolução
           </button>
           <button id="historyTabPRsBtn" onclick="switchHistorySubTab('prs')" style="flex: 1; padding: 8px 4px; border-radius: 9px; border: none; font-size: 11.5px; font-weight: 800; cursor: pointer; background: transparent; color: var(--text-grey); transition: all 0.2s;">
             🏆 Recordes
@@ -8590,13 +8591,54 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
     // SISTEMA AVANÇADO DE EXECUÇÃO DE TREINO (PADRÃO HEVY / STRONG)
     // ==========================================
 
+    function getWorkoutHistoryList() {
+      const uid = getEffectiveUserId();
+      let list = [];
+      const userKey = uid ? `titannovafit_history_${uid}` : null;
+      try {
+        if (userKey) {
+          const userRaw = localStorage.getItem(userKey);
+          if (userRaw) {
+            const parsed = JSON.parse(userRaw);
+            if (Array.isArray(parsed) && parsed.length > 0) list = parsed;
+          }
+        }
+        if (!Array.isArray(list) || list.length === 0) {
+          const globalRaw = localStorage.getItem('titannovafit_history');
+          if (globalRaw) {
+            const parsed = JSON.parse(globalRaw);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              list = parsed;
+              if (userKey) {
+                try { localStorage.setItem(userKey, JSON.stringify(list)); } catch (_) {}
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[Storage] Erro ao ler histórico:', e);
+      }
+      return Array.isArray(list) ? list : [];
+    }
+
+    function saveWorkoutHistoryList(list) {
+      if (!Array.isArray(list)) return;
+      const uid = getEffectiveUserId();
+      const userKey = uid ? `titannovafit_history_${uid}` : null;
+      const jsonStr = JSON.stringify(list);
+      try {
+        if (userKey) localStorage.setItem(userKey, jsonStr);
+        localStorage.setItem('titannovafit_history', jsonStr);
+      } catch (e) {
+        console.warn('[Storage] Erro ao persistir histórico:', e);
+      }
+    }
+
     function getHistoricalMaxWeight(exerciseName) {
       if (!exerciseName) return 0;
-      const uid = getEffectiveUserId();
-      const historyKey = uid ? `titannovafit_history_${uid}` : 'titannovafit_history';
       let maxWeight = 0;
       try {
-        const list = JSON.parse(localStorage.getItem(historyKey) || '[]');
+        const list = getWorkoutHistoryList();
         list.forEach(sess => {
           if (Array.isArray(sess.exercicios_detalhados)) {
             sess.exercicios_detalhados.forEach(ex => {
@@ -8615,10 +8657,8 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
 
     function getLastExercisePerformance(exerciseName) {
       if (!exerciseName) return null;
-      const uid = getEffectiveUserId();
-      const historyKey = uid ? `titannovafit_history_${uid}` : 'titannovafit_history';
       try {
-        const list = JSON.parse(localStorage.getItem(historyKey) || '[]');
+        const list = getWorkoutHistoryList();
         for (const sess of list) {
           if (Array.isArray(sess.exercicios_detalhados)) {
             const match = sess.exercicios_detalhados.find(e => (e.nome || '').toLowerCase().trim() === exerciseName.toLowerCase().trim());
@@ -9029,29 +9069,40 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
           const peso = parseFloat(weightInput ? weightInput.value : 0) || 0;
           const reps = parseInt(repsInput ? repsInput.value : 0) || 0;
 
-          if (isDone) {
+          // Considerar como executada se marcada como done OU se tiver peso/reps inseridos OU se foi finalizado o treino completo
+          const isCompleted = isDone || (reps > 0) || (peso > 0);
+
+          if (isCompleted) {
+            row.classList.add('done');
             totalCompletedSets++;
-            const setVol = peso * reps;
+            const effectiveReps = reps > 0 ? reps : 10;
+            const setVol = peso * effectiveReps;
             volumeTotalKg += setVol;
 
-            // Detecção de PR
+            // Detecção robusta de PR por exercício (evitando duplicatas na mesma sessão)
             const histMax = getHistoricalMaxWeight(exName);
             let isPr = false;
             if (peso > 0 && peso > histMax) {
               isPr = true;
-              prsDetectados.push({
-                exercicio: exName,
-                pesoAnterior: histMax,
-                novoPeso: peso,
-                reps: reps
-              });
+              const existingPr = prsDetectados.find(p => (p.exercicio || '').toLowerCase() === exName.toLowerCase());
+              if (!existingPr) {
+                prsDetectados.push({
+                  exercicio: exName,
+                  pesoAnterior: histMax,
+                  novoPeso: peso,
+                  reps: effectiveReps
+                });
+              } else if (peso > existingPr.novoPeso) {
+                existingPr.novoPeso = peso;
+                existingPr.reps = effectiveReps;
+              }
             }
 
             const serieObj = {
               numero: sIdx + 1,
               tipo: setType,
               peso: peso,
-              reps: reps,
+              reps: effectiveReps,
               volume: setVol,
               is_pr: isPr,
               concluida: true
@@ -9064,7 +9115,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
               serie_numero: sIdx + 1,
               tipo_serie: setType,
               peso_kg: peso,
-              repeticoes: reps,
+              repeticoes: effectiveReps,
               is_pr: isPr
             });
           }
@@ -9079,6 +9130,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
         }
       });
 
+      volumeTotalKg = Math.round(volumeTotalKg * 10) / 10;
       const sessaoId = 'sessao_' + Date.now();
       const clientId = TitanNovaOfflineSync.generateClientId();
 
@@ -9099,25 +9151,18 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
         concluido: true
       };
 
-      // 2. Salvar no localStorage por usuário
-      const uid = getEffectiveUserId();
-      const historyStorageKey = `titannovafit_history_${uid}`;
-      let historyList = [];
-      try {
-        historyList = JSON.parse(localStorage.getItem(historyStorageKey) || '[]');
-      } catch (e) {}
+      // 2. Salvar no localStorage de forma resiliente
+      const historyList = getWorkoutHistoryList();
       historyList.unshift(historyItem);
-      if (uid) {
-        localStorage.setItem(historyStorageKey, JSON.stringify(historyList));
-      }
-      localStorage.setItem('titannovafit_history', JSON.stringify(historyList));
+      saveWorkoutHistoryList(historyList);
 
       // 3. Sincronizar com Supabase se online
-      if (_supabase && uid) {
+      const uid = getEffectiveUserId();
+      if (_supabase && uid && uid !== 'offline_user_local') {
         const payload = {
           id: historyItem.id,
           user_id: uid,
-          usuario_id: uid,
+          usuario_id: String(uid),
           client_id: clientId,
           nome_treino: title,
           duracao_segundos: activeWorkoutSeconds,
@@ -9182,8 +9227,12 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       if (floatingBar) floatingBar.style.display = 'none';
       document.getElementById('activeTimer').innerText = '00:00';
 
-      // 5. Atualizar UI de histórico e tela inicial
+      // 5. Atualizar UI de histórico, evolução e tela inicial
       renderHistoryCardUI(historyItem, true);
+      populateChartExerciseSelect();
+      renderEvolutionChart();
+      renderPersonalRecordsAndMuscles();
+      renderCalendarView();
       updateHomeScreenUI();
 
       // 6. Exibir Modal de Celebração de Treino Concluído
@@ -10130,62 +10179,9 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
     async function loadHistoryFromStorage(silent = false) {
       const container = document.getElementById('historyListContainer');
       const uid = getEffectiveUserId();
-      if (!uid) {
-        if (container) container.innerHTML = '';
-        return;
-      }
 
-      const historyStorageKey = `titannovafit_history_${uid}`;
-      let historyList = [];
-      try {
-        historyList = JSON.parse(localStorage.getItem(historyStorageKey) || '[]');
-      } catch (e) {}
-
-      // Sincronizar com Supabase
-      if (_supabase) {
-        try {
-          let data = null;
-          let error = null;
-
-          const res1 = await _supabase.from('sessoes_de_treino').select('*').eq('usuario_id', uid).order('fim', { ascending: false });
-          if (!res1.error) {
-            data = res1.data;
-          } else {
-            const res2 = await _supabase.from('sessoes_de_treino').select('*').eq('user_id', uid).order('fim', { ascending: false });
-            data = res2.data;
-            error = res2.error;
-          }
-
-          if (!error && Array.isArray(data)) {
-            const onlineHistory = data.map(row => {
-              const fimDate = row.fim ? new Date(row.fim) : new Date();
-              const inicioDate = row.inicio ? new Date(row.inicio) : fimDate;
-              const duracaoMin = row.duracao_segundos ? Math.max(1, Math.round(row.duracao_segundos / 60)) : Math.max(1, Math.round((fimDate - inicioDate) / 60000));
-              const dataFormatada = fimDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-
-              return {
-                id: row.id,
-                nomeTreino: row.nome_treino || 'Treino Concluído',
-                duracaoMinutos: duracaoMin,
-                duracaoSegundos: row.duracao_segundos || 0,
-                volume_total_kg: row.volume_total_kg || 0,
-                exercicios_detalhados: row.exercicios_detalhados || [],
-                prs_detectados: row.prs_detectados || [],
-                data: dataFormatada,
-                inicioIso: row.inicio,
-                fimIso: row.fim,
-                timestamp: fimDate.getTime(),
-                concluido: row.concluido !== false
-              };
-            });
-
-            historyList = onlineHistory;
-            localStorage.setItem(historyStorageKey, JSON.stringify(historyList));
-          }
-        } catch (e) {
-          console.warn('[Supabase Sync Histórico Warning]:', e);
-        }
-      }
+      // 1. Carregamento imediato do cache local resiliente (offline-first)
+      let historyList = getWorkoutHistoryList();
 
       if (container) {
         container.innerHTML = '';
@@ -10205,6 +10201,93 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
         }
       }
 
+      // 2. Sincronização inteligente com Supabase (sem nunca apagar treinos locais com resposta vazia)
+      if (_supabase && uid && uid !== 'offline_user_local') {
+        try {
+          if (!silent) showSyncStatus('saving');
+          let data = null;
+          let error = null;
+
+          const res1 = await _supabase.from('sessoes_de_treino').select('*').eq('usuario_id', uid).order('fim', { ascending: false });
+          if (!res1.error && Array.isArray(res1.data)) {
+            data = res1.data;
+          } else {
+            const res2 = await _supabase.from('sessoes_de_treino').select('*').eq('user_id', uid).order('fim', { ascending: false });
+            if (!res2.error && Array.isArray(res2.data)) {
+              data = res2.data;
+            } else {
+              error = res2.error;
+            }
+          }
+
+          if (!error && Array.isArray(data)) {
+            const onlineHistory = data.map(row => {
+              const fimDate = row.fim ? new Date(row.fim) : new Date();
+              const inicioDate = row.inicio ? new Date(row.inicio) : fimDate;
+              const duracaoMin = row.duracao_segundos ? Math.max(1, Math.round(row.duracao_segundos / 60)) : Math.max(1, Math.round((fimDate - inicioDate) / 60000));
+              const dataFormatada = fimDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+              return {
+                id: row.id,
+                client_id: row.client_id || row.id,
+                nomeTreino: row.nome_treino || 'Treino Concluído',
+                duracaoMinutos: duracaoMin,
+                duracaoSegundos: row.duracao_segundos || 0,
+                volume_total_kg: parseFloat(row.volume_total_kg || 0),
+                exercicios_detalhados: row.exercicios_detalhados || [],
+                prs_detectados: row.prs_detectados || [],
+                data: dataFormatada,
+                inicioIso: row.inicio,
+                fimIso: row.fim,
+                timestamp: fimDate.getTime(),
+                concluido: row.concluido !== false
+              };
+            });
+
+            // MESCLAGEM INTELIGENTE: Preserva treinos locais que ainda não sincronizaram
+            const mergedMap = new Map();
+            onlineHistory.forEach(item => {
+              mergedMap.set(item.id, item);
+              if (item.client_id) mergedMap.set(item.client_id, item);
+            });
+            historyList.forEach(localItem => {
+              const key = localItem.id || localItem.client_id;
+              if (!mergedMap.has(key)) {
+                mergedMap.set(key, localItem);
+              } else {
+                const existing = mergedMap.get(key);
+                if ((!existing.exercicios_detalhados || existing.exercicios_detalhados.length === 0) && (localItem.exercicios_detalhados && localItem.exercicios_detalhados.length > 0)) {
+                  mergedMap.set(key, { ...existing, ...localItem });
+                }
+              }
+            });
+
+            const mergedList = Array.from(new Set(mergedMap.values())).sort((a, b) => {
+              const timeA = a.timestamp || (a.fimIso ? new Date(a.fimIso).getTime() : 0);
+              const timeB = b.timestamp || (b.fimIso ? new Date(b.fimIso).getTime() : 0);
+              return timeB - timeA;
+            });
+
+            if (mergedList.length > 0) {
+              historyList = mergedList;
+              saveWorkoutHistoryList(historyList);
+
+              if (container) {
+                container.innerHTML = '';
+                historyList.forEach(item => renderHistoryCardUI(item, false));
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('[Supabase Sync Histórico Warning]:', e);
+        }
+      }
+
+      // Atualizar views de Evolução (Gráficos, PRs, Calendário e Home)
+      populateChartExerciseSelect();
+      renderEvolutionChart();
+      renderPersonalRecordsAndMuscles();
+      renderCalendarView();
       updateHomeScreenUI();
     }
 
@@ -10266,9 +10349,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       ];
       title.innerText = `${monthNames[currentCalendarMonth]} de ${currentCalendarYear}`;
 
-      const uid = getEffectiveUserId();
-      const historyKey = uid ? `titannovafit_history_${uid}` : 'titannovafit_history';
-      const historyList = JSON.parse(localStorage.getItem(historyKey) || '[]');
+      const historyList = getWorkoutHistoryList();
 
       // Mapa de dias com treinos
       const workoutDaysMap = new Map();
@@ -10285,7 +10366,6 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       const totalDaysInMonth = new Date(currentCalendarYear, currentCalendarMonth + 1, 0).getDate();
 
       let gridHtml = '';
-      // Dias vazios do mês anterior
       for (let i = 0; i < firstDayIndex; i++) {
         gridHtml += `<div style="height: 40px; opacity: 0.2;"></div>`;
       }
@@ -10310,9 +10390,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       const container = document.getElementById('calendarSelectedDaySessions');
       if (!container) return;
 
-      const uid = getEffectiveUserId();
-      const historyKey = uid ? `titannovafit_history_${uid}` : 'titannovafit_history';
-      const historyList = JSON.parse(localStorage.getItem(historyKey) || '[]');
+      const historyList = getWorkoutHistoryList();
 
       const daySessions = historyList.filter(item => {
         const t = item.timestamp ? new Date(item.timestamp) : (item.inicioIso ? new Date(item.inicioIso) : null);
@@ -10355,26 +10433,39 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       const select = document.getElementById('chartExerciseSelect');
       if (!select) return;
 
-      const uid = getEffectiveUserId();
-      const historyKey = uid ? `titannovafit_history_${uid}` : 'titannovafit_history';
-      const historyList = JSON.parse(localStorage.getItem(historyKey) || '[]');
+      const historyList = getWorkoutHistoryList();
 
       const exercisesSet = new Set();
       historyList.forEach(sess => {
         if (Array.isArray(sess.exercicios_detalhados)) {
           sess.exercicios_detalhados.forEach(ex => {
-            if (ex.nome) exercisesSet.add(ex.nome);
+            if (ex.nome && Array.isArray(ex.series) && ex.series.length > 0) {
+              exercisesSet.add(ex.nome);
+            }
           });
         }
       });
 
       if (exercisesSet.size === 0) {
-        select.innerHTML = '<option value="">-- Nenhum exercício com dados registrados --</option>';
+        if (typeof DEFAULT_BASE_EXERCISES !== 'undefined' && Array.isArray(DEFAULT_BASE_EXERCISES)) {
+          DEFAULT_BASE_EXERCISES.slice(0, 8).forEach(ex => {
+            if (ex.nome || ex.name) exercisesSet.add(ex.nome || ex.name);
+          });
+        }
+      }
+
+      if (exercisesSet.size === 0) {
+        select.innerHTML = '<option value="">-- Nenhum exercício registrado ainda --</option>';
         return;
       }
 
-      const options = Array.from(exercisesSet).sort().map(name => `<option value="${name}">${name}</option>`);
+      const prevValue = select.value;
+      const sortedNames = Array.from(exercisesSet).sort();
+      const options = sortedNames.map(name => `<option value="${name}" ${name === prevValue ? 'selected' : ''}>${name}</option>`);
       select.innerHTML = options.join('');
+      if (!select.value && sortedNames.length > 0) {
+        select.value = sortedNames[0];
+      }
     }
 
     function switchChartMetric(metric) {
@@ -10404,23 +10495,20 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       const ctx = canvas.getContext('2d');
       const exName = select ? select.value : '';
 
-      // Ajustar resolução para nitidez
       const rect = canvas.getBoundingClientRect();
-      canvas.width = rect.width * (window.devicePixelRatio || 1);
-      canvas.height = rect.height * (window.devicePixelRatio || 1);
+      const clientW = rect.width || canvas.parentElement?.clientWidth || 340;
+      const clientH = rect.height || 200;
+      canvas.width = clientW * (window.devicePixelRatio || 1);
+      canvas.height = clientH * (window.devicePixelRatio || 1);
       ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
 
-      const W = rect.width;
-      const H = rect.height;
+      const W = clientW;
+      const H = clientH;
       ctx.clearRect(0, 0, W, H);
 
-      const uid = getEffectiveUserId();
-      const historyKey = uid ? `titannovafit_history_${uid}` : 'titannovafit_history';
-      const historyList = JSON.parse(localStorage.getItem(historyKey) || '[]');
+      const historyList = getWorkoutHistoryList();
 
-      // Extrair pontos cronológicos para o exercício selecionado
       const dataPoints = [];
-      // Ordenar do mais antigo ao mais recente
       const sortedHistory = [...historyList].reverse();
 
       sortedHistory.forEach(sess => {
@@ -10436,9 +10524,11 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
               val = match.series.reduce((max, s) => Math.max(max, parseInt(s.reps || s.repeticoes || 0)), 0);
             }
 
-            if (val > 0) {
+            if (val > 0 || (currentChartMetric === 'load' && match.series.some(s => parseInt(s.reps || s.repeticoes || 0) > 0))) {
+              const rawDate = (sess.data || '').split(/[ ,]+/)[0] || '';
+              const cleanDate = rawDate.length >= 5 ? rawDate.slice(0, 5) : rawDate;
               dataPoints.push({
-                date: (sess.data || '').split(' ')[0],
+                date: cleanDate || 'Hoje',
                 value: val
               });
             }
@@ -10464,7 +10554,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       const values = dataPoints.map(d => d.value);
       const minVal = Math.min(...values);
       const maxVal = Math.max(...values);
-      const range = (maxVal - minVal) === 0 ? 1 : (maxVal - minVal);
+      const range = (maxVal - minVal) === 0 ? (maxVal === 0 ? 10 : maxVal) : (maxVal - minVal);
 
       // Linhas de grade horizontais
       ctx.strokeStyle = '#22252c';
@@ -10552,11 +10642,8 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       const prContainer = document.getElementById('personalRecordsContainer');
       const muscleContainer = document.getElementById('muscleDistributionContainer');
 
-      const uid = getEffectiveUserId();
-      const historyKey = uid ? `titannovafit_history_${uid}` : 'titannovafit_history';
-      const historyList = JSON.parse(localStorage.getItem(historyKey) || '[]');
+      const historyList = getWorkoutHistoryList();
 
-      // 1. Calcular Maiores Cargas (PRs)
       const prMap = new Map();
       const muscleCounts = {};
 
@@ -10568,19 +10655,21 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
               ex.series.forEach(s => {
                 const w = parseFloat(s.peso || s.peso_kg || 0) || 0;
                 const r = parseInt(s.reps || s.repeticoes || 0) || 0;
-                if (!prMap.has(name) || w > prMap.get(name).weight) {
+                const prev = prMap.get(name);
+                if (!prev || w > prev.weight || (w === prev.weight && r > prev.reps)) {
                   prMap.set(name, {
                     weight: w,
                     reps: r,
-                    date: (sess.data || '').split(' ')[0]
+                    date: (sess.data || '').split(/[ ,]+/)[0] || 'Hoje'
                   });
                 }
               });
             }
 
             // Músculo
-            const matched = exercisesList.find(x => (x.nome || '').toLowerCase() === (name || '').toLowerCase()) || {};
-            const muscle = matched.grupoMuscular || 'Outros';
+            const matched = (typeof exercisesList !== 'undefined' ? exercisesList.find(x => (x.nome || '').toLowerCase() === (name || '').toLowerCase()) : null) ||
+                            (typeof DEFAULT_BASE_EXERCISES !== 'undefined' ? DEFAULT_BASE_EXERCISES.find(x => (x.nome || x.name || '').toLowerCase() === (name || '').toLowerCase()) : null) || {};
+            const muscle = matched.grupoMuscular || matched.grupo_muscular || 'Geral';
             muscleCounts[muscle] = (muscleCounts[muscle] || 0) + (ex.series ? ex.series.length : 1);
           });
         }
@@ -10599,7 +10688,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
                 <div style="font-size: 11px; color: var(--text-grey);">📅 ${data.date} • ${data.reps} reps</div>
               </div>
               <div style="font-size: 16px; font-weight: 900; color: #ffb300; background: rgba(255,179,0,0.12); padding: 4px 10px; border-radius: 8px; border: 1px solid rgba(255,179,0,0.3);">
-                ${data.weight} kg
+                ${data.weight > 0 ? `${data.weight} kg` : `${data.reps} reps`}
               </div>
             </div>
           `).join('');
@@ -10635,9 +10724,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
     // EXPORTAÇÃO DE DADOS (CSV / JSON)
     // ==========================================
     function exportHistoryData(format) {
-      const uid = getEffectiveUserId();
-      const historyKey = uid ? `titannovafit_history_${uid}` : 'titannovafit_history';
-      const list = JSON.parse(localStorage.getItem(historyKey) || '[]');
+      const list = getWorkoutHistoryList();
       if (list.length === 0) {
         showToastNotification('Não há dados de treino para exportar.');
         return;
@@ -10684,15 +10771,10 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
         if (card) card.remove();
 
         const uid = getEffectiveUserId();
-        const historyStorageKey = `titannovafit_history_${uid}`;
+        let historyList = getWorkoutHistoryList().filter(h => h.id !== id && h.client_id !== id);
+        saveWorkoutHistoryList(historyList);
 
-        try {
-          let historyList = JSON.parse(localStorage.getItem(historyStorageKey) || '[]');
-          historyList = historyList.filter(h => h.id !== id);
-          localStorage.setItem(historyStorageKey, JSON.stringify(historyList));
-        } catch (e) {}
-
-        if (_supabase && uid) {
+        if (_supabase && uid && uid !== 'offline_user_local') {
           try {
             showSyncStatus('saving');
             const outcome = await TitanNovaOfflineSync.syncOperationToSupabase({
@@ -10728,10 +10810,11 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
 
     async function clearAllHistory() {
       if (confirm('Tem certeza que deseja limpar todo o histórico de treinos?')) {
+        const uid = getEffectiveUserId();
+        if (uid) localStorage.removeItem(`titannovafit_history_${uid}`);
         localStorage.removeItem('titannovafit_history');
-        if (_supabase) {
+        if (_supabase && uid && uid !== 'offline_user_local') {
           try {
-            const uid = getEffectiveUserId();
             await _supabase.from('sessoes_de_treino').delete().eq('usuario_id', uid);
           } catch (_) {}
         }
@@ -10756,22 +10839,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
         }
       }
 
-      const uid = getEffectiveUserId();
-      let historyList = [];
-      try {
-        if (uid) {
-          historyList = JSON.parse(localStorage.getItem(`titannovafit_history_${uid}`) || '[]');
-        }
-        if (!historyList || historyList.length === 0) {
-          historyList = JSON.parse(localStorage.getItem('titannovafit_history') || '[]');
-        }
-      } catch (e) {}
-
-      if (historyList && historyList.length > 0) {
-        try {
-          localStorage.setItem('titannovafit_history', JSON.stringify(historyList));
-        } catch (_) {}
-      }
+      const historyList = getWorkoutHistoryList();
 
       const now = new Date();
 
@@ -12787,7 +12855,16 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
         const hash = (window.location.hash || '').toLowerCase();
         const savedTab = localStorage.getItem('titannovafit_active_tab');
         let targetScreen = 'screenHome';
+        let targetSubTab = null;
         if (hash.includes('admin')) targetScreen = 'screenAdmin';
+        else if (hash.includes('evolucao') || hash.includes('evolution') || hash.includes('graficos')) {
+          targetScreen = 'screenHistory';
+          targetSubTab = 'charts';
+        }
+        else if (hash.includes('recordes') || hash.includes('prs')) {
+          targetScreen = 'screenHistory';
+          targetSubTab = 'prs';
+        }
         else if (hash.includes('history') || hash.includes('historico')) targetScreen = 'screenHistory';
         else if (hash.includes('exercises') || hash.includes('exercicios')) targetScreen = 'screenExercises';
         else if (hash.includes('workouts') || hash.includes('treinos')) targetScreen = 'screenWorkouts';
@@ -12798,6 +12875,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
           navigateToAdminPanel().catch(e => console.error("[AUTH ERROR]", e));
         } else {
           switchTab(targetScreen);
+          if (targetSubTab) switchHistorySubTab(targetSubTab);
         }
       } else {
         // unauthenticated
@@ -12968,6 +13046,8 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
 
       if (!currentAuthUser) return;
       if (h.includes('admin')) navigateToAdminPanel();
+      else if (h.includes('evolucao') || h.includes('evolution') || h.includes('graficos')) { switchTab('screenHistory'); switchHistorySubTab('charts'); }
+      else if (h.includes('recordes') || h.includes('prs')) { switchTab('screenHistory'); switchHistorySubTab('prs'); }
       else if (h.includes('historico') || h.includes('history')) switchTab('screenHistory');
       else if (h.includes('exercicios') || h.includes('exercises')) switchTab('screenExercises');
       else if (h.includes('treinos') || h.includes('workouts')) switchTab('screenWorkouts');
