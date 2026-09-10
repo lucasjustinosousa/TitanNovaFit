@@ -5393,9 +5393,20 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       if (navElement) {
         navItems.forEach(i => i.classList.remove('active'));
         navElement.classList.add('active');
-      } else if (navMap[screenId] !== undefined && navItems[navMap[screenId]]) {
-        navItems.forEach(i => i.classList.remove('active'));
-        navItems[navMap[screenId]].classList.add('active');
+      } else {
+        let matched = false;
+        navItems.forEach(i => {
+          if (i.getAttribute('data-screen') === screenId) {
+            i.classList.add('active');
+            matched = true;
+          } else {
+            i.classList.remove('active');
+          }
+        });
+        if (!matched && navMap[screenId] !== undefined && navItems[navMap[screenId]]) {
+          navItems.forEach(i => i.classList.remove('active'));
+          navItems[navMap[screenId]].classList.add('active');
+        }
       }
 
       // Se navegou para a tela de gestão de alunos do Personal, recarregar a lista
@@ -15046,7 +15057,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
           </div>
           <div class="nav-item ${activeScreen === 'screenExercises' ? 'active' : ''}" data-screen="screenExercises" onclick="switchTab('screenExercises', this)">
             <div class="nav-icon">🏋️‍♂️</div>
-            Biblioteca
+            Exercícios
           </div>
           <div class="nav-item ${activeScreen === 'screenTrainerStudents' ? 'active' : ''}" data-screen="screenTrainerStudents" onclick="switchTab('screenTrainerStudents', this)">
             <div class="nav-icon">👥</div>
@@ -15074,7 +15085,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
           </div>
           <div class="nav-item ${activeScreen === 'screenExercises' ? 'active' : ''}" data-screen="screenExercises" onclick="switchTab('screenExercises', this)">
             <div class="nav-icon">🏋️‍♂️</div>
-            Biblioteca
+            Exercícios
           </div>
           <div class="nav-item" onclick="openTrainerInviteModal()">
             <div class="nav-icon">✉️</div>
@@ -15095,9 +15106,9 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
             <div class="nav-icon">📋</div>
             Treinos
           </div>
-          <div class="nav-item ${activeScreen === 'screenActiveWorkout' ? 'active' : ''}" data-screen="screenActiveWorkout" onclick="quickStartWorkoutNav(this)">
-            <div class="nav-icon" style="color: var(--accent-cyan);">⚡</div>
-            Executar
+          <div class="nav-item ${activeScreen === 'screenExercises' ? 'active' : ''}" data-screen="screenExercises" onclick="switchTab('screenExercises', this)">
+            <div class="nav-icon">🏋️‍♂️</div>
+            Exercícios
           </div>
           <div class="nav-item ${activeScreen === 'screenHistory' ? 'active' : ''}" data-screen="screenHistory" onclick="switchTab('screenHistory', this)">
             <div class="nav-icon">📊</div>
