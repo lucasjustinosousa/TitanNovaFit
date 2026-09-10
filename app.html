@@ -1791,7 +1791,11 @@
 
         <!-- Sub-aba 2: Gerenciamento de Usuários -->
         <div id="adminSubTabUsers" style="display: none;">
-          <div style="font-size: 12px; color: var(--text-grey); margin-bottom: 10px;">Atletas e contas registradas no Supabase:</div>
+          <div style="display: flex; gap: 8px; margin-bottom: 12px; align-items: center;">
+            <input type="text" id="adminUserSearchInput" oninput="filterAdminUsersList()" class="form-input" style="flex: 1; margin: 0; padding: 8px 12px; font-size: 12px;" placeholder="🔍 Buscar usuário por nome, e-mail ou tipo...">
+            <button onclick="loadAdminUsersList()" class="btn btn-outline" style="width: auto; padding: 8px 12px; font-size: 11px;">🔄 Atualizar</button>
+          </div>
+          <div style="font-size: 11.5px; color: var(--text-grey); margin-bottom: 10px;">Atletas e contas registradas no Supabase (segurança estrita - sem senhas expostas):</div>
           <div id="adminUsersListContainer" class="admin-list-grid">
             <!-- Renderizado dinamicamente -->
           </div>
@@ -3878,11 +3882,182 @@
 
     
     // ==========================================
-    // SISTEMA SEGURO DE ADMINISTRADOR (SUPABASE RLS)
+    // SISTEMA SEGURO DE CONTAS, PLANOS E ADMIN (PlanProvider)
     // ==========================================
     let isCurrentSessionAdmin = false;
     let adminUsersList = [];
     let adminLogsList = [];
+
+    const PlanProvider = {
+      isAdmin: false,
+      accountType: 'athlete', // 'athlete' | 'trainer' | 'admin'
+      roles: ['athlete'],
+      currentPlan: 'free',
+      planName: 'Grátis',
+      subscriptionStatus: 'active',
+      billingCycle: 'free',
+      currentPeriodEnd: null,
+      features: {},
+      limits: { workout_limit: 3, history_days: 30, student_limit: 0 },
+      isLoaded: false,
+
+      async init(userId = null) {
+        const uid = userId || getEffectiveUserId();
+        if (!uid || uid === 'offline_user_local') {
+          this.isAdmin = false;
+          this.accountType = (currentUserProfile && currentUserProfile.account_type) || 'athlete';
+          this.currentPlan = 'free';
+          this.planName = 'Grátis';
+          this.isLoaded = true;
+          this.syncWithFeatureGate();
+          return this;
+        }
+
+        try {
+          if (_supabase) {
+            // 1. Chamar RPC segura get_my_entitlements()
+            const { data: ent, error: entErr } = await _supabase.rpc('get_my_entitlements');
+            if (!entErr && ent) {
+              this.applyEntitlements(ent);
+              this.isLoaded = true;
+              return this;
+            }
+
+            // 2. Fallback: verificar se é admin via RPC is_admin()
+            const { data: adminBool, error: adminErr } = await _supabase.rpc('is_admin');
+            if (!adminErr && adminBool === true) {
+              this.applyEntitlements({
+                is_admin: true,
+                account_type: 'admin',
+                roles: ['admin'],
+                plan_code: null,
+                plan_name: null,
+                status: 'not_applicable',
+                features: 'administrative_access',
+                limits: null,
+                current_period_end: null
+              });
+              this.isLoaded = true;
+              return this;
+            }
+
+            // 3. Fallback: consultar public.user_roles no Supabase
+            const { data: roleData } = await _supabase
+              .from('user_roles')
+              .select('role')
+              .eq('user_id', uid)
+              .eq('role', 'admin')
+              .eq('active', true)
+              .maybeSingle();
+
+            if (roleData && roleData.role === 'admin') {
+              this.applyEntitlements({
+                is_admin: true,
+                account_type: 'admin',
+                roles: ['admin'],
+                plan_code: null,
+                plan_name: null,
+                status: 'not_applicable',
+                features: 'administrative_access',
+                limits: null,
+                current_period_end: null
+              });
+              this.isLoaded = true;
+              return this;
+            }
+          }
+        } catch (err) {
+          console.warn('[PlanProvider Init Notice]:', err);
+        }
+
+        // Se regular
+        this.isAdmin = false;
+        isCurrentSessionAdmin = false;
+        this.accountType = (currentUserProfile && currentUserProfile.account_type) || 'athlete';
+        this.currentPlan = 'free';
+        this.planName = 'Grátis';
+        this.subscriptionStatus = 'active';
+        this.billingCycle = 'free';
+        this.features = {
+          workout_limit: true,
+          exercise_library: true,
+          gif_demonstrations: true,
+          sets_and_reps: true,
+          rest_timer: true,
+          multi_device_sync: true,
+          beginner_templates: true,
+          offline_mode: true
+        };
+        this.limits = {
+          workout_limit: 3,
+          history_days: 30,
+          student_limit: this.accountType === 'trainer' ? 2 : 0
+        };
+        this.isLoaded = true;
+        this.syncWithFeatureGate();
+        return this;
+      },
+
+      applyEntitlements(data) {
+        this.isAdmin = !!data.is_admin;
+        if (this.isAdmin) {
+          this.accountType = 'admin';
+          this.roles = ['admin'];
+          this.currentPlan = null;
+          this.planName = null;
+          this.subscriptionStatus = 'not_applicable';
+          this.billingCycle = null;
+          this.currentPeriodEnd = null;
+          this.features = 'administrative_access';
+          this.limits = null;
+          isCurrentSessionAdmin = true;
+        } else {
+          this.accountType = data.account_type || (currentUserProfile && currentUserProfile.account_type) || 'athlete';
+          this.roles = data.roles || [this.accountType];
+          this.currentPlan = (data.plan_code || 'free').toLowerCase();
+          this.planName = data.plan_name || (this.currentPlan.charAt(0).toUpperCase() + this.currentPlan.slice(1));
+          this.subscriptionStatus = data.status || 'active';
+          this.billingCycle = data.billing_cycle || 'free';
+          this.currentPeriodEnd = data.current_period_end || null;
+          this.features = data.features || {};
+          this.limits = data.limits || { workout_limit: 3, history_days: 30 };
+          isCurrentSessionAdmin = false;
+        }
+        this.syncWithFeatureGate();
+      },
+
+      syncWithFeatureGate() {
+        if (typeof FeatureGate !== 'undefined') {
+          FeatureGate.currentSubscription = {
+            is_admin: this.isAdmin,
+            plan_code: this.currentPlan,
+            plan_name: this.planName,
+            status: this.subscriptionStatus,
+            billing_cycle: this.billingCycle,
+            current_period_end: this.currentPeriodEnd,
+            features: this.features,
+            limits: this.limits
+          };
+          if (typeof FeatureGate.updateProfilePlanUI === 'function') {
+            FeatureGate.updateProfilePlanUI();
+          }
+        }
+      },
+
+      can(featureKey) {
+        if (this.isAdmin) return true; // Administrador possui acesso total
+        if (this.features === 'administrative_access') return true;
+        if (!this.features) return false;
+        return !!this.features[featureKey];
+      },
+
+      getLimit(limitKey) {
+        if (this.isAdmin) return null; // Administrador não possui limites
+        if (!this.limits) return null;
+        return this.limits[limitKey] !== undefined ? this.limits[limitKey] : null;
+      }
+    };
+    window.PlanProvider = PlanProvider;
 
     async function syncUserToDatabase(authUser, customName, extraProfileData = {}) {
       if (!_supabase || !authUser || !authUser.id) return;
@@ -4006,38 +4181,8 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
     }
 
     async function checkAdminPermission(userId) {
-      if (!userId) {
-        isCurrentSessionAdmin = false;
-        return false;
-      }
-
-      // 1. Consultar a tabela segura admin_users no Supabase
-      if (_supabase) {
-        try {
-          const { data, error } = await _supabase
-            .from('admin_users')
-            .select('user_id')
-            .eq('user_id', userId)
-            .maybeSingle();
-
-          if (!error && data && data.user_id) {
-            isCurrentSessionAdmin = true;
-            return true;
-          }
-        } catch (e) {
-          console.warn('[Admin Permission Check Warning]:', e);
-        }
-      }
-
-      // 2. Fallback de verificação pelo e-mail master do projeto
-      const email = getEffectiveUserEmail().toLowerCase().trim();
-      if (email === 'atleta@titannovafit.com' || email === 'titannovafit@gmail.com') {
-        isCurrentSessionAdmin = true;
-        return true;
-      }
-
-      isCurrentSessionAdmin = false;
-      return false;
+      await PlanProvider.init(userId);
+      return PlanProvider.isAdmin === true;
     }
 
     async function navigateToAdminPanel() {
@@ -4047,13 +4192,19 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
 
       if (!isAdmin) {
         alert('⚠️ Acesso Negado!\n\nVocê não possui permissão de administrador no banco de dados Supabase.');
-        switchTab('screenHome');
+        const fallback = (PlanProvider.accountType === 'trainer') ? 'screenTrainerStudents' : 'screenHome';
+        switchTab(fallback);
         return;
       }
 
+      try {
+        window.history.replaceState(null, '', '/admin');
+      } catch (_) {
+        window.location.hash = 'admin';
+      }
       switchTab('screenAdmin');
       await loadAdminDashboardData();
-      const lastSubTab = localStorage.getItem('titannovafit_admin_subtab') || 'exercises';
+      const lastSubTab = localStorage.getItem('titannovafit_admin_subtab') || 'users';
       switchAdminSubTab(lastSubTab);
     }
 
@@ -4458,6 +4609,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       },
 
       can(featureCode) {
+        if (PlanProvider.isAdmin) return true; // Administrador possui acesso total irrestrito
         if (!this.currentSubscription) this.init();
         const code = this.getPlanCode();
 
@@ -4491,6 +4643,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       },
 
       getLimit(featureCode) {
+        if (PlanProvider.isAdmin) return null; // Administrador não é afetado por limites de planos
         if (!this.currentSubscription) this.init();
         const code = this.getPlanCode();
         if (code !== 'free') return null; // ilimitado para Bronze, Prata e Gold
@@ -4498,6 +4651,9 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       },
 
       canCreateWorkout(additionalCount = 1) {
+        if (PlanProvider.isAdmin) {
+          return { allowed: true, currentCount: (Array.isArray(allWorkoutsList) ? allWorkoutsList.length : 0), limit: null, message: 'Acesso Administrativo Total: fichas ilimitadas.' };
+        }
         const limit = this.getLimit('workout_limit');
         if (limit === null) {
           return { allowed: true, currentCount: allWorkoutsList.length, limit: null, message: 'Fichas ilimitadas liberadas no seu plano.' };
@@ -4522,12 +4678,44 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       },
 
       updateProfilePlanUI() {
-        const planCode = this.getPlanCode();
         const badgeEl = document.getElementById('profilePlanBadge');
         const emojiEl = document.getElementById('profilePlanEmoji');
         const statusEl = document.getElementById('profilePlanStatus');
         const countEl = document.getElementById('profilePlanWorkoutCount');
         const renewalEl = document.getElementById('profilePlanRenewal');
+        const actionBtn = document.querySelector('.app-planos-link');
+
+        if (PlanProvider.isAdmin) {
+          if (badgeEl) {
+            badgeEl.innerText = 'Administrador';
+            badgeEl.style.background = 'rgba(255, 215, 0, 0.2)';
+            badgeEl.style.color = '#ffd700';
+            badgeEl.style.borderColor = 'rgba(255, 215, 0, 0.5)';
+          }
+          if (emojiEl) emojiEl.innerText = '👑';
+          if (statusEl) {
+            statusEl.innerText = 'Acesso Irrestrito';
+            statusEl.style.color = 'var(--success-green)';
+          }
+          if (countEl) countEl.innerText = 'Ilimitadas (Admin)';
+          if (renewalEl) renewalEl.innerText = 'Não aplicável';
+          if (actionBtn) {
+            actionBtn.innerText = '⚙️ Painel do Administrador';
+            actionBtn.href = '/admin';
+            actionBtn.onclick = (e) => {
+              e.preventDefault();
+              switchTab('screenAdmin');
+            };
+          }
+          return;
+        }
+
+        const planCode = this.getPlanCode();
+        if (actionBtn) {
+          actionBtn.innerText = '⭐ Conhecer Planos & Upgrade';
+          actionBtn.href = '/planos';
+          actionBtn.onclick = null;
+        }
 
         const currentCount = Array.isArray(allWorkoutsList) ? allWorkoutsList.length : 0;
         const limit = this.getLimit('workout_limit');
@@ -4982,234 +5170,154 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       }
     }
 
+    let _allAdminUsersData = [];
+
     async function loadAdminUsersList() {
       const container = document.getElementById('adminUsersListContainer');
       if (!container) return;
-      container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-grey);"><div class="spinning" style="display:inline-block; font-size:22px; margin-bottom:8px;">🔄</div><br>Sincronizando usuários do Supabase...</div>';
+      container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-grey);"><div class="spinning" style="display:inline-block; font-size:22px; margin-bottom:8px;">🔄</div><br>Carregando usuários do sistema...</div>';
 
-      const userMap = new Map();
-
-      // 0. Consultar endpoint oficial /api/users (integração 100% automática com Supabase Auth)
       try {
-        const apiResp = await fetch('/api/users');
-        if (apiResp.ok) {
-          const apiJson = await apiResp.json();
-          if (apiJson && Array.isArray(apiJson.users)) {
-            apiJson.users.forEach(u => {
-              if (u && u.id) {
-                userMap.set(String(u.id), {
-                  id: String(u.id),
-                  nome: u.nome || (u.email ? u.email.split('@')[0] : 'Atleta'),
-                  email: u.email || '',
-                  criado_em: u.criado_em,
-                  bloqueado: u.bloqueado === true,
-                  source: 'supabase_auth_api'
-                });
-              }
-            });
+        let token = null;
+        if (_supabase) {
+          token = (await _supabase.auth.getSession())?.data?.session?.access_token;
+        }
+
+        const headers = {};
+        if (token) headers['Authorization'] = 'Bearer ' + token;
+
+        const res = await fetch('/api/users', { headers });
+        if (res.ok) {
+          const json = await res.json();
+          if (json && Array.isArray(json.users)) {
+            _allAdminUsersData = json.users;
+            renderAdminUsersFiltered();
+            return;
           }
         }
-      } catch (_) {}
+      } catch (err) {
+        console.warn('[Admin Users Load API Error]:', err);
+      }
 
+      // Fallback para tabela profiles via Supabase
       if (_supabase) {
-        // 1. Tentar ler do Supabase Auth via RPC get_all_users (Security Definer)
         try {
-          const { data: rpcUsers, error: rpcErr } = await _supabase.rpc('get_all_users');
-          if (!rpcErr && Array.isArray(rpcUsers)) {
-            rpcUsers.forEach(u => {
-              if (u && u.id && !userMap.has(String(u.id))) {
-                userMap.set(String(u.id), {
-                  id: String(u.id),
-                  nome: u.nome || (u.email ? u.email.split('@')[0] : 'Atleta'),
-                  email: u.email || '',
-                  criado_em: u.criado_em || u.created_at,
-                  bloqueado: u.bloqueado === true,
-                  source: 'auth.users'
-                });
-              }
-            });
-          }
-        } catch (_) {}
-
-        // 2. Consultar tabela public.usuarios (tabela nativa no banco)
-        try {
-          const { data: uData, error: uErr } = await _supabase.from('usuarios').select('id, nome, email, criado_em, foto_url').order('criado_em', { ascending: false });
-          if (!uErr && Array.isArray(uData)) {
-            uData.forEach(u => {
-              const uid = String(u.id || '');
-              if (uid && !userMap.has(uid)) {
-                userMap.set(uid, {
-                  id: uid,
-                  nome: u.nome || (u.email ? u.email.split('@')[0] : 'Atleta'),
-                  email: u.email || '',
-                  criado_em: u.criado_em,
-                  bloqueado: false,
-                  source: 'public.usuarios'
-                });
-              }
-            });
-          }
-        } catch (_) {}
-
-        // 3. Consultar tabela public.profiles (caso exista)
-        try {
-          const { data: pData, error: pErr } = await _supabase.from('profiles').select('id, nome, email, criado_em, foto_url').order('criado_em', { ascending: false });
-          if (!pErr && Array.isArray(pData)) {
-            pData.forEach(u => {
-              const uid = String(u.id || '');
-              if (uid && !userMap.has(uid)) {
-                userMap.set(uid, {
-                  id: uid,
-                  nome: u.nome || (u.email ? u.email.split('@')[0] : 'Atleta'),
-                  email: u.email || '',
-                  criado_em: u.criado_em,
-                  bloqueado: false,
-                  source: 'public.profiles'
-                });
-              }
-            });
-          }
-        } catch (_) {}
-
-        // 4. Identificar atletas adicionais a partir de treinos criados
-        try {
-          const { data: tData } = await _supabase.from('treinos').select('usuario_id, criado_em');
-          if (Array.isArray(tData)) {
-            tData.forEach(t => {
-              const uid = String(t.usuario_id || '');
-              if (uid && uid.length > 10 && !userMap.has(uid)) {
-                userMap.set(uid, {
-                  id: uid,
-                  nome: 'Atleta com Treinos Registrados',
-                  email: `atleta_${uid.substring(0, 8)}@supabase`,
-                  criado_em: t.criado_em,
-                  bloqueado: false,
-                  source: 'public.treinos'
-                });
-              }
-            });
+          const { data: users, error } = await _supabase.from('profiles').select('id, nome, email, account_type, criado_em');
+          if (!error && Array.isArray(users)) {
+            _allAdminUsersData = users.map(u => ({
+              id: u.id,
+              nome: u.nome || u.email?.split('@')[0] || 'Usuário',
+              email: u.email || '',
+              account_type: u.account_type || 'athlete',
+              plan_code: 'free',
+              status: 'active',
+              bloqueado: false
+            }));
+            renderAdminUsersFiltered();
+            return;
           }
         } catch (_) {}
       }
 
-      // 5. Garantir inclusão do usuário da sessão atual do admin
-      if (currentAuthUser && currentAuthUser.id) {
-        const myUid = String(currentAuthUser.id);
-        const myEmail = currentAuthUser.email || getEffectiveUserEmail();
-        const myNome = (currentAuthUser.user_metadata && currentAuthUser.user_metadata.nome) || 'Administrador TitanNova';
-        if (!userMap.has(myUid)) {
-          userMap.set(myUid, {
-            id: myUid,
-            nome: myNome,
-            email: myEmail,
-            criado_em: currentAuthUser.created_at || new Date().toISOString(),
-            bloqueado: false,
-            source: 'session'
-          });
-        }
-        // Sincronizar o admin imediatamente com a tabela usuarios
-        syncUserToDatabase(currentAuthUser, myNome);
-      }
+      container.innerHTML = '<div style="text-align: center; color: var(--text-grey); padding: 20px; font-size: 12px;">Nenhum usuário localizado.</div>';
+    }
 
-      const users = Array.from(userMap.values());
+    function filterAdminUsersList() {
+      renderAdminUsersFiltered();
+    }
 
-      // Atualizar contagem no KPI de Usuários
-      const uEl = document.getElementById('adminKpiUsers');
-      if (uEl) uEl.innerText = users.length;
+    function renderAdminUsersFiltered() {
+      const container = document.getElementById('adminUsersListContainer');
+      if (!container) return;
 
-      if (users.length === 0) {
-        container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-grey);">Nenhum usuário encontrado no banco de dados.</div>';
+      const q = (document.getElementById('adminUserSearchInput')?.value || '').toLowerCase().trim();
+      const filtered = _allAdminUsersData.filter(u => {
+        if (!q) return true;
+        const n = (u.nome || '').toLowerCase();
+        const e = (u.email || '').toLowerCase();
+        const r = (u.account_type || '').toLowerCase();
+        return n.includes(q) || e.includes(q) || r.includes(q);
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: var(--text-grey); padding: 20px; font-size: 12px;">Nenhum usuário encontrado para esta busca.</div>';
         return;
       }
 
-      container.innerHTML = users.map((u, idx) => {
-        const dateStr = u.criado_em ? new Date(u.criado_em).toLocaleDateString('pt-BR') : 'Hoje';
-        const uidShort = (u.id || '').length > 14 ? (u.id.substring(0, 14) + '...') : u.id;
-        const isBlocked = u.bloqueado === true;
+      const currentUid = getEffectiveUserId();
+
+      container.innerHTML = filtered.map(u => {
+        const isSelf = u.id === currentUid;
+        const roleName = u.account_type === 'admin' ? '👑 Administrador' : (u.account_type === 'trainer' ? '💪 Personal' : '🏃 Atleta');
+        const roleBg = u.account_type === 'admin' ? 'rgba(255,215,0,0.18)' : (u.account_type === 'trainer' ? 'rgba(255,215,0,0.12)' : 'rgba(30,136,229,0.15)');
+        const roleColor = u.account_type === 'admin' ? '#ffd700' : (u.account_type === 'trainer' ? '#ffd700' : '#90caf9');
+
+        const planName = (u.plan_code || 'free').toUpperCase();
+        const isSuspended = u.status === 'suspended' || u.bloqueado === true;
 
         return `
-          <div class="card" style="margin: 0 0 8px 0; padding: 12px; background: #121622; border-left: 4px solid ${isBlocked ? '#ff5252' : 'var(--primary-blue)'};">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div class="card" style="margin: 0; padding: 12px; background: #161a24; border: 1px solid ${isSuspended ? 'rgba(255,82,82,0.4)' : 'var(--divider)'}; border-radius: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 6px;">
               <div>
-                <div style="font-size: 13px; font-weight: 800; color: white;">${u.nome || 'Atleta'}</div>
-                <div style="font-size: 11px; color: var(--accent-cyan); margin-top: 2px;">${u.email}</div>
-                <div style="font-size: 10px; color: var(--text-grey); font-family: monospace; margin-top: 4px;">ID: ${uidShort} • Cadastro: ${dateStr}</div>
+                <div style="font-weight: 800; font-size: 13px; color: white;">${escapeHtml(u.nome || 'Usuário')} ${isSelf ? '<span style="font-size: 10px; color: var(--accent-cyan);">(Você)</span>' : ''}</div>
+                <div style="font-size: 11px; color: var(--text-grey); font-family: monospace;">${escapeHtml(u.email || '')}</div>
               </div>
-              <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
-                <span style="font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 6px; background: ${isBlocked ? 'rgba(255,82,82,0.18)' : 'rgba(76,175,80,0.18)'}; color: ${isBlocked ? '#ff5252' : 'var(--success-green)'};">
-                  ${isBlocked ? 'BLOQUEADO' : 'ATIVO'}
-                </span>
-                <div style="display: flex; gap: 4px; margin-top: 2px;">
-                  <button onclick="toggleBlockUser('${u.id}', '${u.nome || u.email}', ${isBlocked})" class="btn btn-outline" style="width: auto; padding: 3px 8px; font-size: 10px; color: ${isBlocked ? 'var(--success-green)' : '#ff5252'}; border-color: rgba(255,82,82,0.35);">
-                    ${isBlocked ? 'Desbloquear' : 'Bloquear'}
-                  </button>
-                  <button onclick="adminDeleteUserAccount('${u.id}', '${u.nome || u.email}')" class="btn btn-outline" style="width: auto; padding: 3px 8px; font-size: 10px; color: #ff5252; border-color: rgba(255,82,82,0.4);">
-                    🗑️ Excluir
-                  </button>
-                </div>
+              <div style="display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end;">
+                <span style="font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 6px; background: ${roleBg}; color: ${roleColor};">${roleName}</span>
+                <span style="font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 6px; background: rgba(0,210,255,0.12); color: var(--accent-cyan);">Plano: ${planName}</span>
+                <span style="font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 6px; background: ${isSuspended ? 'rgba(255,82,82,0.2)' : 'rgba(76,175,80,0.2)'}; color: ${isSuspended ? '#ff5252' : 'var(--success-green)'};">${isSuspended ? 'Suspenso' : 'Ativo'}</span>
               </div>
+            </div>
+
+            <div style="display: flex; gap: 6px; margin-top: 10px;">
+              ${!isSelf ? `
+                <button onclick="adminToggleUserSuspend('${u.id}', ${!isSuspended})" class="btn btn-outline" style="flex: 1; padding: 6px; font-size: 11px; border-color: ${isSuspended ? 'var(--success-green)' : '#ff5252'}; color: ${isSuspended ? 'var(--success-green)' : '#ff5252'};">
+                  ${isSuspended ? 'Reativar Conta' : 'Suspender Conta'}
+                </button>
+                <button onclick="adminSelectUserForPlan('${escapeHtml(u.email)}')" class="btn btn-primary" style="width: auto; padding: 6px 12px; font-size: 11px; font-weight: 800;">
+                  Atribuir Plano
+                </button>
+              ` : `
+                <div style="font-size: 10.5px; color: var(--text-grey); padding: 4px 0;">Sua conta de administrador está ativa com acesso irrestrito.</div>
+              `}
             </div>
           </div>
         `;
       }).join('');
     }
 
-    async function toggleBlockUser(userId, userName, currentBlocked) {
-      const actionStr = currentBlocked ? 'desbloquear' : 'bloquear';
-      if (confirm(`Deseja realmente ${actionStr} o usuário "${userName}"?`)) {
-        if (_supabase) {
-          try {
-            await _supabase.from('profiles').update({ bloqueado: !currentBlocked }).eq('id', userId);
-            await _supabase.from('usuarios').update({ bloqueado: !currentBlocked }).eq('id', userId);
-          } catch (_) {}
-        }
-        await logAdminAction(currentBlocked ? 'Usuário Desbloqueado' : 'Usuário Bloqueado', 'profiles', userId, { nome: userName });
-        showToastNotification(`Usuário "${userName}" ${currentBlocked ? 'desbloqueado' : 'bloqueado'}.`);
-        loadAdminUsersList();
+    function adminSelectUserForPlan(email) {
+      switchAdminSubTab('subscriptions');
+      const input = document.getElementById('adminSubSearchEmail');
+      if (input) {
+        input.value = email;
+        adminSearchUserPlan();
       }
     }
 
-    async function adminDeleteUserAccount(userId, userDisplay) {
-      if (!isCurrentSessionAdmin) {
-        alert('Acesso negado: Somente o administrador master pode excluir contas.');
-        return;
-      }
-
-      if (currentAuthUser && currentAuthUser.id === userId) {
-        alert('Você não pode excluir a sua própria conta de administrador master por segurança.');
-        return;
-      }
-
-      const confirmMsg = `ATENÇÃO ADMINISTRADOR:\n\nDeseja realmente excluir permanentemente a conta de "${userDisplay}" (ID: ${userId})?\n\nEsta operação é irreversível e removerá todos os treinos, históricos e o acesso no Supabase Auth.`;
-      if (!confirm(confirmMsg)) {
-        return;
-      }
-
-      showSyncStatus('saving');
-      showToastNotification('Excluindo conta do usuário...');
+    async function adminToggleUserSuspend(userId, suspend) {
+      if (!confirm(`Deseja realmente ${suspend ? 'suspender' : 'reativar'} o acesso deste usuário?`)) return;
 
       try {
-        const resp = await fetch(`/api/users?userId=${encodeURIComponent(userId)}`, {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' }
+        let token = null;
+        if (_supabase) token = (await _supabase.auth.getSession())?.data?.session?.access_token;
+
+        const res = await fetch('/api/users?action=toggle_suspend', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify({ userId, suspend })
         });
 
-        if (_supabase) {
-          try {
-            await _supabase.from('treinos').delete().eq('usuario_id', userId);
-            await _supabase.from('usuarios').delete().eq('id', userId);
-            await _supabase.from('legal_acceptances').delete().eq('user_id', userId);
-          } catch (_) {}
-        }
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error || 'Falha ao atualizar status.');
 
-        await logAdminAction('Conta de Atleta Excluída pelo Administrador', 'usuarios', userId);
-        showSyncStatus('saved');
-        showToastNotification(`Conta de "${userDisplay}" excluída com sucesso!`);
+        showToastNotification(`Status atualizado: usuário ${suspend ? 'suspenso' : 'reativado'}.`);
         await loadAdminUsersList();
       } catch (err) {
-        console.error('[Admin Delete User Error]:', err);
-        showSyncStatus('idle');
-        alert(`Erro ao excluir usuário: ${err.message}`);
+        alert('Erro ao alterar status do usuário: ' + err.message);
       }
     }
 
@@ -5221,8 +5329,21 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       let logs = [];
       if (_supabase) {
         try {
-          const { data, error } = await _supabase.from('admin_logs').select('*').order('criado_em', { ascending: false }).limit(30);
-          if (!error && Array.isArray(data)) logs = data;
+          // Consultar tabela admin_audit_logs primeiro
+          const { data, error } = await _supabase.from('admin_audit_logs').select('*').order('created_at', { ascending: false }).limit(40);
+          if (!error && Array.isArray(data) && data.length > 0) {
+            logs = data.map(l => ({
+              acao: l.action,
+              tabela_afetada: l.target_type || 'Geral',
+              registro_id: l.target_id,
+              detalhes: l.details,
+              criado_em: l.created_at
+            }));
+          } else {
+            // Fallback para admin_logs
+            const { data: oldLogs } = await _supabase.from('admin_logs').select('*').order('criado_em', { ascending: false }).limit(30);
+            if (Array.isArray(oldLogs)) logs = oldLogs;
+          }
         } catch (_) {}
       }
 
@@ -5236,11 +5357,11 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
         return `
           <div class="card" style="margin: 0; padding: 10px 12px; background: #121622; border-left: 3px solid #ffd700;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-              <span style="font-size: 12px; font-weight: 800; color: #ffd700;">${l.acao}</span>
+              <span style="font-size: 12px; font-weight: 800; color: #ffd700;">${escapeHtml(l.acao || 'AÇÃO')}</span>
               <span style="font-size: 10px; color: var(--text-grey); font-family: monospace;">${timeStr}</span>
             </div>
             <div style="font-size: 11px; color: var(--text-grey);">
-              Tabela: <strong style="color: white;">${l.tabela_afetada || 'Geral'}</strong> • ID: <span style="font-family: monospace; color: var(--accent-cyan);">${l.registro_id || '--'}</span>
+              Alvo: <strong style="color: white;">${escapeHtml(l.tabela_afetada || 'Geral')}</strong> • ID: <span style="font-family: monospace; color: var(--accent-cyan);">${escapeHtml(String(l.registro_id || '--'))}</span>
             </div>
           </div>
         `;
@@ -5248,6 +5369,14 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
     }
 
     function switchTab(screenId, navElement) {
+      // Bloqueio rigoroso de segurança: usuários comuns não podem acessar a tela administrativa
+      if (screenId === 'screenAdmin' && !PlanProvider.isAdmin) {
+        showToastNotification('⚠️ Acesso não autorizado.');
+        const fallback = (PlanProvider.accountType === 'trainer') ? 'screenTrainerStudents' : 'screenHome';
+        switchTab(fallback);
+        return;
+      }
+
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
       const target = document.getElementById(screenId);
       if (target) target.classList.add('active');
@@ -5730,20 +5859,18 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
     }
 
     function isCurrentUserAdmin() {
-      if (isCurrentSessionAdmin) return true;
-      const email = getEffectiveUserEmail().toLowerCase().trim();
-      return email === 'atleta@titannovafit.com' || (currentAuthUser && currentAuthUser.user_metadata && currentAuthUser.user_metadata.role === 'admin');
+      return PlanProvider.isAdmin === true;
     }
 
     function updateProfileUI() {
       const email = getEffectiveUserEmail();
-      const isAdmin = isCurrentUserAdmin();
+      const isAdmin = PlanProvider.isAdmin === true;
       const name = (currentAuthUser && currentAuthUser.user_metadata && currentAuthUser.user_metadata.nome) ||
                    (isAdmin ? 'Administrador TitanNova' : (email.split('@')[0] || 'Atleta TitanNova'));
       const uid = getEffectiveUserId();
 
       const nameEl = document.getElementById('profileUserName');
-      if (nameEl) nameEl.innerText = isAdmin ? `${name} 👑` : name;
+      if (nameEl) nameEl.innerText = isAdmin ? (name + ' 👑') : name;
 
       const emailEl = document.getElementById('profileUserEmail');
       if (emailEl) emailEl.innerText = email;
@@ -5754,7 +5881,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       const badgeEl = document.getElementById('profileUserBadge');
       if (badgeEl) {
         if (isAdmin) {
-          badgeEl.innerText = '👑 Administrador Master';
+          badgeEl.innerText = '👑 Acesso Administrativo Total';
           badgeEl.style.background = 'rgba(255,215,0,0.18)';
           badgeEl.style.color = '#ffd700';
           badgeEl.style.border = '1px solid rgba(255,215,0,0.4)';
@@ -5766,7 +5893,27 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
         }
       }
 
-      // Atualizar badge e seções específicas de Atleta ou Personal Trainer
+      const roleBadge = document.getElementById('profileAccountTypeBadge');
+      if (roleBadge) {
+        if (isAdmin) {
+          roleBadge.innerHTML = '🛡️ Administrador';
+          roleBadge.style.background = 'rgba(255,215,0,0.2)';
+          roleBadge.style.color = '#ffd700';
+          roleBadge.style.borderColor = 'rgba(255,215,0,0.5)';
+        } else if (PlanProvider.accountType === 'trainer') {
+          roleBadge.innerHTML = '💪 Personal Trainer';
+          roleBadge.style.background = 'rgba(255,215,0,0.15)';
+          roleBadge.style.color = '#ffd700';
+          roleBadge.style.borderColor = 'rgba(255,215,0,0.4)';
+        } else {
+          roleBadge.innerHTML = '🏃 Atleta';
+          roleBadge.style.background = 'rgba(30,136,229,0.2)';
+          roleBadge.style.color = '#90caf9';
+          roleBadge.style.borderColor = 'rgba(30,136,229,0.4)';
+        }
+      }
+
+      // Atualizar seções específicas de Atleta ou Personal Trainer
       if (typeof updateRoleUI === 'function') {
         updateRoleUI();
       }
@@ -6883,10 +7030,16 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
             }, 600);
           }
 
+          await PlanProvider.init(authUser.id);
+          updateProfileUI();
+          updateBottomNavForRole();
+
           if (role === 'trainer') {
+            try { window.history.replaceState(null, '', '/personal'); } catch (_) { window.location.hash = 'personal'; }
             switchTab('screenTrainerStudents');
             showToastNotification(`🎉 Bem-vindo(a), ${profName || name}! Modo Personal Trainer ativado.`);
           } else {
+            try { window.history.replaceState(null, '', '/atleta'); } catch (_) { window.location.hash = 'atleta'; }
             switchTab('screenHome');
             renderAllWorkoutsUI();
             showToastNotification(`🎉 Bem-vindo(a), ${name}! Sua conta de Atleta foi criada.`);
@@ -7030,12 +7183,24 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
         await syncUserToDatabase(authUser, userName);
 
         document.getElementById('bottomNav').style.display = 'flex';
-        await checkAdminPermission(authUser.id);
+        await PlanProvider.init(authUser.id);
         updateProfileUI();
-        switchTab('screenHome');
+        updateBottomNavForRole();
         showSyncStatus('saved');
         showToastNotification(`✅ Conectado como ${authUser.email}!`);
         await carregarDadosDoUsuario(authUser.id);
+
+        if (PlanProvider.isAdmin) {
+          try { window.history.replaceState(null, '', '/admin'); } catch (_) { window.location.hash = 'admin'; }
+          switchTab('screenAdmin');
+          await loadAdminDashboardData();
+        } else if (PlanProvider.accountType === 'trainer') {
+          try { window.history.replaceState(null, '', '/personal'); } catch (_) { window.location.hash = 'personal'; }
+          switchTab('screenTrainerStudents');
+        } else {
+          try { window.history.replaceState(null, '', '/atleta'); } catch (_) { window.location.hash = 'atleta'; }
+          switchTab('screenHome');
+        }
       } catch (err) {
         const errStatus = err.status || err.code || 'UNKNOWN';
         console.error(`[Login Tratado]: Código ${errStatus} - Mensagem: ${err.message}`);
@@ -13366,7 +13531,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       if (loadingOverlay) loadingOverlay.style.display = 'none';
     }
 
-    function setAuthStatus(newStatus, user = null) {
+    async function setAuthStatus(newStatus, user = null) {
       authStatus = newStatus;
       console.log(`[AUTH STATE]: ${newStatus}`);
       const navEl = document.getElementById('bottomNav');
@@ -13383,14 +13548,29 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       if (newStatus === 'authenticated' && user) {
         currentAuthUser = user;
         if (navEl) navEl.style.display = 'flex';
-        updateProfileUI();
 
+        await PlanProvider.init(user.id);
+        updateProfileUI();
+        updateBottomNavForRole();
+
+        const path = (window.location.pathname || '').toLowerCase();
         const hash = (window.location.hash || '').toLowerCase();
         const savedTab = localStorage.getItem('titannovafit_active_tab');
         let targetScreen = 'screenHome';
         let targetSubTab = null;
-        if (hash.includes('admin')) targetScreen = 'screenAdmin';
-        else if (hash.includes('evolucao') || hash.includes('evolution') || hash.includes('graficos')) {
+
+        if (path.includes('admin') || hash.includes('admin')) {
+          if (PlanProvider.isAdmin) {
+            targetScreen = 'screenAdmin';
+          } else {
+            showToastNotification('⚠️ Acesso não autorizado.');
+            targetScreen = (PlanProvider.accountType === 'trainer') ? 'screenTrainerStudents' : 'screenHome';
+          }
+        } else if (path.includes('personal') || hash.includes('personal')) {
+          targetScreen = 'screenTrainerStudents';
+        } else if (path.includes('atleta') || hash.includes('atleta')) {
+          targetScreen = 'screenHome';
+        } else if (hash.includes('evolucao') || hash.includes('evolution') || hash.includes('graficos')) {
           targetScreen = 'screenHistory';
           targetSubTab = 'charts';
         }
@@ -13402,7 +13582,13 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
         else if (hash.includes('exercises') || hash.includes('exercicios')) targetScreen = 'screenExercises';
         else if (hash.includes('workouts') || hash.includes('treinos')) targetScreen = 'screenWorkouts';
         else if (hash.includes('profile') || hash.includes('perfil')) targetScreen = 'screenProfile';
-        else if (savedTab && document.getElementById(savedTab)) targetScreen = savedTab;
+        else if (savedTab && document.getElementById(savedTab)) {
+          targetScreen = savedTab;
+        } else {
+          if (PlanProvider.isAdmin) targetScreen = 'screenAdmin';
+          else if (PlanProvider.accountType === 'trainer') targetScreen = 'screenTrainerStudents';
+          else targetScreen = 'screenHome';
+        }
 
         if (targetScreen === 'screenAdmin') {
           navigateToAdminPanel().catch(e => console.error("[AUTH ERROR]", e));
@@ -13685,11 +13871,24 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
 
     // Atualização dos elementos da interface conforme o papel do usuário (Atleta ou Personal)
     function updateRoleUI() {
-      const isTrainer = (currentUserProfile?.account_type === 'trainer') || (currentAuthUser?.user_metadata?.account_type === 'trainer');
+      const isTrainer = (PlanProvider.accountType === 'trainer') || (currentUserProfile?.account_type === 'trainer') || (currentAuthUser?.user_metadata?.account_type === 'trainer');
       const badgeRole = document.getElementById('profileAccountTypeBadge');
       const navItemStudents = document.getElementById('navItemStudents');
       const athleteSec = document.getElementById('athletePersonalSection');
       const trainerSec = document.getElementById('trainerProfileSection');
+
+      if (PlanProvider.isAdmin) {
+        if (badgeRole) {
+          badgeRole.innerHTML = '🛡️ Modo Administrador • Acesso Total';
+          badgeRole.style.background = 'rgba(255,215,0,0.2)';
+          badgeRole.style.color = '#ffd700';
+          badgeRole.style.borderColor = 'rgba(255,215,0,0.5)';
+        }
+        if (navItemStudents) navItemStudents.style.display = 'none';
+        if (athleteSec) athleteSec.style.display = 'none';
+        if (trainerSec) trainerSec.style.display = 'none';
+        return;
+      }
 
       if (isTrainer) {
         if (badgeRole) {
@@ -13734,8 +13933,6 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       }
     }
 
-    // ==============================================================================
-    // MÓDULO DO PERSONAL TRAINER: GESTÃO DE ALUNOS, CONVITES E PRESCRIÇÕES
     // ==============================================================================
     const TrainerModule = {
       currentStudentsTab: 'active',
@@ -14835,8 +15032,35 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
     function updateBottomNavForRole() {
       const navEl = document.getElementById('bottomNav');
       if (!navEl) return;
-      const mode = getActiveRoleMode();
       const activeScreen = localStorage.getItem('titannovafit_active_tab') || 'screenHome';
+
+      if (PlanProvider.isAdmin) {
+        navEl.innerHTML = `
+          <div class="nav-item ${activeScreen === 'screenAdmin' ? 'active' : ''}" data-screen="screenAdmin" onclick="switchTab('screenAdmin', this)">
+            <div class="nav-icon">🛡️</div>
+            Admin
+          </div>
+          <div class="nav-item ${activeScreen === 'screenWorkouts' ? 'active' : ''}" data-screen="screenWorkouts" onclick="switchTab('screenWorkouts', this)">
+            <div class="nav-icon">📋</div>
+            Treinos
+          </div>
+          <div class="nav-item ${activeScreen === 'screenExercises' ? 'active' : ''}" data-screen="screenExercises" onclick="switchTab('screenExercises', this)">
+            <div class="nav-icon">🏋️‍♂️</div>
+            Biblioteca
+          </div>
+          <div class="nav-item ${activeScreen === 'screenTrainerStudents' ? 'active' : ''}" data-screen="screenTrainerStudents" onclick="switchTab('screenTrainerStudents', this)">
+            <div class="nav-icon">👥</div>
+            Personais
+          </div>
+          <div class="nav-item ${activeScreen === 'screenProfile' ? 'active' : ''}" data-screen="screenProfile" onclick="switchTab('screenProfile', this)">
+            <div class="nav-icon">👤</div>
+            Perfil
+          </div>
+        `;
+        return;
+      }
+
+      const mode = getActiveRoleMode();
 
       if (mode === 'trainer') {
         navEl.innerHTML = `

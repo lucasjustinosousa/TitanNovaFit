@@ -54,6 +54,22 @@
       "destination": "/planos.html"
     },
     {
+      "source": "/admin",
+      "destination": "/app.html"
+    },
+    {
+      "source": "/admin/(.*)",
+      "destination": "/app.html"
+    },
+    {
+      "source": "/personal",
+      "destination": "/app.html"
+    },
+    {
+      "source": "/atleta",
+      "destination": "/app.html"
+    },
+    {
       "source": "/termos-de-uso",
       "destination": "/termos-de-uso.html"
     },

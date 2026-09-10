@@ -18,6 +18,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 
+  <!-- Supabase JS Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <style>
     :root {
       --bg-black: #0c0e14;
@@ -605,6 +608,20 @@
     <!-- CARDS DOS 4 PLANOS -->
     
       <!-- SELETOR DE MODALIDADE: ATLETA vs PERSONAL TRAINER -->
+      
+    <!-- BANNER DE ACESSO TOTAL DO ADMINISTRADOR -->
+    <div id="adminPlanNoticeBanner" style="display: none; background: linear-gradient(135deg, rgba(255,215,0,0.12), rgba(0,210,255,0.12)); border: 1px solid #ffd700; border-radius: 14px; padding: 16px 20px; margin-bottom: 24px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.4);">
+      <div style="display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 16px; font-weight: 900; color: #ffd700; margin-bottom: 6px;">
+        <span>👑</span> Modo Administrador Ativo — Acesso Total Irrestrito
+      </div>
+      <p style="font-size: 13px; color: #f1f5f9; margin: 0; line-height: 1.5; max-width: 760px; margin: 0 auto 12px auto;">
+        Você está autenticado como <strong>Administrador do TitanNova Fit</strong>. Você possui acesso irrestrito a todos os recursos da plataforma, treinos ilimitados, homologação de personais e auditoria, e <strong>não precisa escolher, comprar ou possuir planos</strong>.
+      </p>
+      <a href="/app#admin" class="btn" style="display: inline-block; padding: 8px 18px; font-size: 12px; font-weight: 800; background: #ffd700; color: #0c0e14; text-decoration: none; border-radius: 8px;">
+        ⚙️ Acessar Painel Administrativo
+      </a>
+    </div>
+
       <div class="role-toggle-container">
         <div class="role-toggle-box">
           <button id="btnRoleAthlete" class="role-toggle-btn active" onclick="switchPlanRoleView('athlete')">
@@ -697,9 +714,7 @@
           <li><span class="icon check">✓</span> <span>Sem publicidade</span></li>
         </ul>
 
-        <button class="plan-action-btn" onclick="alert('O Plano Bronze estará disponível para contratação em breve!\n\nNo momento, utilize todos os recursos essenciais do Plano Grátis.');" style="cursor: pointer; border: 1px solid #CD7F32; color: #CD7F32; background: transparent;">
-          <span>Escolher Bronze</span>
-        </button>
+        <button class="plan-action-btn" id="btnActionBronze" onclick="handleSelectPlan('bronze')" style="cursor: pointer; border: 1px solid #CD7F32; color: #CD7F32; background: transparent; font-weight: 700;"><span>Escolher Bronze</span></button>
       </div>
 
       <!-- 3. PRATA (Mais Escolhido) -->
@@ -715,10 +730,10 @@
         </div>
 
         <div class="plan-price-wrapper">
-          <div class="plan-price" style="font-size: 24px; color: #E0E0E0;">
-            Em breve
+          <div class="plan-price" style="font-size: 32px; color: #E0E0E0;">
+            R$ <span id="priceSilver">14,90</span> <span class="period" id="periodSilver">/mês</span>
           </div>
-          <div class="plan-price-sub" id="subSilver">Valores serão divulgados em breve</div>
+          <div class="plan-price-sub" id="subSilver">Cobrado mensalmente</div>
         </div>
 
         <ul class="features-list">
@@ -743,9 +758,7 @@
           <li><span class="icon check">✓</span> <span>Backup aprimorado</span></li>
         </ul>
 
-        <button class="plan-action-btn active-choice" onclick="alert('O Plano Prata estará disponível para contratação em breve!\n\nNo momento, utilize todos os recursos essenciais do Plano Grátis.');" style="cursor: pointer; background: #C0C0C0; color: #0c0e14; font-weight: 800; border: none;">
-          <span>Escolher Prata</span>
-        </button>
+        <button class="plan-action-btn active-choice" id="btnActionSilver" onclick="handleSelectPlan('silver')" style="cursor: pointer; background: #C0C0C0; color: #0c0e14; font-weight: 800; border: none;"><span>Escolher Prata</span></button>
       </div>
 
       <!-- 4. GOLD ATLETA -->
@@ -761,10 +774,10 @@
         </div>
 
         <div class="plan-price-wrapper">
-          <div class="plan-price" style="font-size: 24px; color: #FFD700;">
-            Em breve
+          <div class="plan-price" style="font-size: 32px; color: #FFD700;">
+            R$ <span id="priceGold">24,90</span> <span class="period" id="periodGold">/mês</span>
           </div>
-          <div class="plan-price-sub" id="subGold">Valores serão divulgados em breve</div>
+          <div class="plan-price-sub" id="subGold">Cobrado mensalmente</div>
         </div>
 
         <ul class="features-list">
@@ -783,9 +796,7 @@
           <li><span class="icon check">✓</span> <span>Sem publicidade</span></li>
         </ul>
 
-        <button class="plan-action-btn" onclick="alert('O Plano Gold estará disponível para contratação em breve!\n\nNo momento, utilize todos os recursos essenciais do Plano Grátis.');" style="cursor: pointer; background: #FFD700; color: #0c0e14; font-weight: 800; border: none;">
-          <span>Escolher Gold</span>
-        </button>
+        <button class="plan-action-btn" id="btnActionGold" onclick="handleSelectPlan('gold')" style="cursor: pointer; background: #FFD700; color: #0c0e14; font-weight: 800; border: none;"><span>Escolher Gold</span></button>
       </div>
     </section>
 
@@ -817,9 +828,7 @@
           <li><span class="icon check">✓</span> <span>Comentários na ficha atribuída</span></li>
           <li><span class="icon check">✓</span> <span>Sincronização em nuvem e suporte offline</span></li>
         </ul>
-        <a href="/app" class="plan-action-btn" style="text-align: center; text-decoration: none; display: flex; align-items: center; justify-content: center; background: var(--accent-blue); color: #fff; cursor: pointer;">
-          <span>Começar como Personal</span>
-        </a>
+        <button class="plan-action-btn" id="btnActionTrainerFree" onclick="handleSelectPlan('free')" style="cursor: pointer; background: var(--accent-blue); color: #fff; border: none; font-weight: 700;"><span>Começar no Grátis</span></button>
       </div>
 
       <!-- 2. PERSONAL BRONZE -->
@@ -847,10 +856,7 @@
           <li><span class="icon check">✓</span> <span>Exportação de relatórios dos alunos</span></li>
           <li><span class="icon check">✓</span> <span>Zero anúncios</span></li>
         </ul>
-        <button class="plan-action-btn" onclick="alert('Plano Bronze para Personal Trainers disponível em breve!
-Cadastre-se no plano Grátis para utilizar todas as ferramentas.');" style="cursor: pointer; border: 1px solid #CD7F32; color: #CD7F32; background: transparent;">
-          <span>Escolher Bronze Personal</span>
-        </button>
+        <button class="plan-action-btn" id="btnActionTrainerBronze" onclick="handleSelectPlan('bronze')" style="cursor: pointer; border: 1px solid #CD7F32; color: #CD7F32; background: transparent; font-weight: 700;"><span>Escolher Bronze Personal</span></button>
       </div>
 
       <!-- 3. PERSONAL PRATA (Mais Escolhido) -->
@@ -879,10 +885,7 @@ Cadastre-se no plano Grátis para utilizar todas as ferramentas.');" style="curs
           <li><span class="icon check">✓</span> <span>Atribuição de fichas para múltiplos alunos</span></li>
           <li><span class="icon check">✓</span> <span>Acompanhamento de recordes pessoais (PRs)</span></li>
         </ul>
-        <button class="plan-action-btn active-choice" onclick="alert('Plano Prata para Personal Trainers disponível em breve!
-Cadastre-se no plano Grátis para utilizar todas as ferramentas.');" style="cursor: pointer; background: #C0C0C0; color: #0c0e14; font-weight: 800; border: none;">
-          <span>Escolher Prata Personal</span>
-        </button>
+        <button class="plan-action-btn active-choice" id="btnActionTrainerSilver" onclick="handleSelectPlan('silver')" style="cursor: pointer; background: #C0C0C0; color: #0c0e14; font-weight: 800; border: none;"><span>Escolher Prata Personal</span></button>
       </div>
 
       <!-- 4. PERSONAL GOLD -->
@@ -912,10 +915,7 @@ Cadastre-se no plano Grátis para utilizar todas as ferramentas.');" style="curs
           <li><span class="icon coming">⏳</span> <span>Recursos futuros de equipe e assistentes <span class="badge-soon">Em breve</span></span></li>
           <li><span class="icon coming">⏳</span> <span>Integrações com wearables e balanças <span class="badge-soon">Em breve</span></span></li>
         </ul>
-        <button class="plan-action-btn" onclick="alert('Plano Gold para Personal Trainers disponível em breve!
-Cadastre-se no plano Grátis para utilizar todas as ferramentas.');" style="cursor: pointer; background: #FFD700; color: #0c0e14; font-weight: 800; border: none;">
-          <span>Escolher Gold Personal</span>
-        </button>
+        <button class="plan-action-btn" id="btnActionTrainerGold" onclick="handleSelectPlan('gold')" style="cursor: pointer; background: #FFD700; color: #0c0e14; font-weight: 800; border: none;"><span>Escolher Gold Personal</span></button>
       </div>
     </section>
 
@@ -1006,7 +1006,65 @@ Cadastre-se no plano Grátis para utilizar todas as ferramentas.');" style="curs
     </div>
   </footer>
 
+  
+  <!-- Modal de Confirmação de Downgrade para o Plano Grátis -->
+  <div id="modalDowngradeFree" class="plan-modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(6px); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
+    <div style="background: #161a24; border: 1px solid var(--accent-cyan); border-radius: 16px; max-width: 460px; width: 100%; padding: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.7); text-align: center;">
+      <div style="font-size: 36px; margin-bottom: 10px;">🌱</div>
+      <h3 style="font-size: 18px; font-weight: 800; color: white; margin-bottom: 10px;">Confirmar Mudança para o Plano Grátis?</h3>
+      <p style="font-size: 13px; color: var(--text-grey); line-height: 1.5; margin-bottom: 14px; text-align: left;">
+        Você continuará com <strong>todos os seus treinos, histórico e dados 100% preservados</strong> no banco de dados. Nada do que você já registrou será excluído!
+      </p>
+      <div style="background: rgba(0,210,255,0.06); border: 1px dashed rgba(0,210,255,0.3); border-radius: 10px; padding: 12px; font-size: 12px; color: #b3e5fc; text-align: left; margin-bottom: 20px; line-height: 1.4;">
+        ⚠️ <strong>O que muda:</strong> Novas criações de treinos respeitarão o limite do plano Grátis (até 3 fichas ativas) e recursos avançados de análise permanecerão pausados.
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <button onclick="closeModalDowngradeFree()" style="flex: 1; padding: 12px; font-size: 12.5px; border: 1px solid var(--border-light); color: var(--text-grey); background: transparent; border-radius: 10px; cursor: pointer; font-weight: 600;">
+          Cancelar
+        </button>
+        <button onclick="executeDowngradeToFree()" id="btnConfirmDowngrade" style="flex: 1; padding: 12px; font-size: 12.5px; font-weight: 800; background: var(--accent-cyan); color: #0c0e14; border: none; border-radius: 10px; cursor: pointer;">
+          Confirmar Grátis
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Assinaturas Pagas em Breve -->
+  <div id="modalPaidPlanSoon" class="plan-modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(6px); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
+    <div style="background: #161a24; border: 1px solid #ffd700; border-radius: 16px; max-width: 460px; width: 100%; padding: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.7); text-align: center;">
+      <div style="font-size: 36px; margin-bottom: 10px;" id="modalPaidEmoji">🥈</div>
+      <h3 style="font-size: 18px; font-weight: 800; color: white; margin-bottom: 8px;" id="modalPaidTitle">Plano em Fase de Liberação</h3>
+      <div id="modalPaidBadge" style="display: inline-block; font-size: 11px; font-weight: 800; padding: 3px 12px; border-radius: 12px; background: rgba(255,215,0,0.18); color: #ffd700; margin-bottom: 14px;">Assinaturas Pagas em Breve</div>
+      <p style="font-size: 13px; color: #cbd5e1; line-height: 1.5; margin-bottom: 16px; text-align: left;">
+        Estamos integrando o checkout automatizado com <strong>PIX instantâneo e Cartão de Crédito</strong>.
+      </p>
+      <div style="background: rgba(255,215,0,0.06); border: 1px dashed rgba(255,215,0,0.3); border-radius: 10px; padding: 12px; font-size: 12px; color: #ffe082; text-align: left; margin-bottom: 20px; line-height: 1.4;">
+        💡 <strong>Você não é cobrado agora:</strong> Enquanto finalizamos a integração de pagamento, utilize normalmente todos os recursos do plano Grátis na sua conta. Seus dados e treinos estão garantidos!
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <button onclick="closeModalPaidPlanSoon()" style="flex: 1; padding: 12px; font-size: 12.5px; border: 1px solid var(--border-light); color: var(--text-grey); background: transparent; border-radius: 10px; cursor: pointer; font-weight: 600;">
+          Fechar
+        </button>
+        <a href="/app" style="flex: 1; padding: 12px; font-size: 12.5px; font-weight: 800; background: linear-gradient(135deg, #00d2ff, #1e88e5); color: #fff; text-decoration: none; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+          Ir para o App
+        </a>
+      </div>
+    </div>
+  </div>
+
   <script>
+    const SUPABASE_URL = 'https://gplgywrvejefulsjpkax.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_em6WHZt2Ol8JZ16fe_Lcyg_ETq_kIPY';
+    let _supabase = null;
+    if (window.supabase) {
+      _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true
+        }
+      });
+    }
 
     let currentPlanRole = 'athlete';
     function switchPlanRoleView(role) {
@@ -1018,9 +1076,7 @@ Cadastre-se no plano Grátis para utilizar todas as ferramentas.');" style="curs
 
       if (role === 'trainer') {
         if (btnAth) btnAth.classList.remove('active');
-        if (btnTra) {
-          btnTra.classList.add('trainer-active');
-        }
+        if (btnTra) btnTra.classList.add('trainer-active');
         if (gridAth) gridAth.style.display = 'none';
         if (gridTra) gridTra.style.display = 'grid';
       } else {
@@ -1043,76 +1099,274 @@ Cadastre-se no plano Grátis para utilizar todas as ferramentas.');" style="curs
         btnAnnual.classList.add('active');
 
         // Valores Anuais
-        document.getElementById('priceBronze').innerText = '5,82';
-        document.getElementById('periodBronze').innerText = '/mês no anual';
-        document.getElementById('subBronze').innerText = 'R$ 69,90 cobrados anualmente (Economia de 26%)';
+        const pBronze = document.getElementById('priceBronze');
+        if (pBronze) pBronze.innerText = '5,82';
+        const perBronze = document.getElementById('periodBronze');
+        if (perBronze) perBronze.innerText = '/mês no anual';
+        const subBronze = document.getElementById('subBronze');
+        if (subBronze) subBronze.innerText = 'R$ 69,90 cobrados anualmente (Economia de 26%)';
 
-        document.getElementById('priceSilver').innerText = '10,82';
-        document.getElementById('periodSilver').innerText = '/mês no anual';
-        document.getElementById('subSilver').innerText = 'R$ 129,90 cobrados anualmente (Economia de 27%)';
+        const pSilver = document.getElementById('priceSilver');
+        if (pSilver) pSilver.innerText = '10,82';
+        const perSilver = document.getElementById('periodSilver');
+        if (perSilver) perSilver.innerText = '/mês no anual';
+        const subSilver = document.getElementById('subSilver');
+        if (subSilver) subSilver.innerText = 'R$ 129,90 cobrados anualmente (Economia de 27%)';
 
-        document.getElementById('priceGold').innerText = '18,32';
-        document.getElementById('periodGold').innerText = '/mês no anual';
-        document.getElementById('subGold').innerText = 'R$ 219,90 cobrados anualmente (Economia de 26%)';
+        const pGold = document.getElementById('priceGold');
+        if (pGold) pGold.innerText = '18,32';
+        const perGold = document.getElementById('periodGold');
+        if (perGold) perGold.innerText = '/mês no anual';
+        const subGold = document.getElementById('subGold');
+        if (subGold) subGold.innerText = 'R$ 219,90 cobrados anualmente (Economia de 26%)';
       } else {
         btnAnnual.classList.remove('active');
         btnMonthly.classList.add('active');
 
         // Valores Mensais
-        document.getElementById('priceBronze').innerText = '7,90';
-        document.getElementById('periodBronze').innerText = '/mês';
-        document.getElementById('subBronze').innerText = 'Cobrado mensalmente';
+        const pBronze = document.getElementById('priceBronze');
+        if (pBronze) pBronze.innerText = '7,90';
+        const perBronze = document.getElementById('periodBronze');
+        if (perBronze) perBronze.innerText = '/mês';
+        const subBronze = document.getElementById('subBronze');
+        if (subBronze) subBronze.innerText = 'Cobrado mensalmente';
 
-        document.getElementById('priceSilver').innerText = '14,90';
-        document.getElementById('periodSilver').innerText = '/mês';
-        document.getElementById('subSilver').innerText = 'Cobrado mensalmente';
+        const pSilver = document.getElementById('priceSilver');
+        if (pSilver) pSilver.innerText = '14,90';
+        const perSilver = document.getElementById('periodSilver');
+        if (perSilver) perSilver.innerText = '/mês';
+        const subSilver = document.getElementById('subSilver');
+        if (subSilver) subSilver.innerText = 'Cobrado mensalmente';
 
-        document.getElementById('priceGold').innerText = '24,90';
-        document.getElementById('periodGold').innerText = '/mês';
-        document.getElementById('subGold').innerText = 'Cobrado mensalmente';
+        const pGold = document.getElementById('priceGold');
+        if (pGold) pGold.innerText = '24,90';
+        const perGold = document.getElementById('periodGold');
+        if (perGold) perGold.innerText = '/mês';
+        const subGold = document.getElementById('subGold');
+        if (subGold) subGold.innerText = 'Cobrado mensalmente';
       }
     }
 
-    // Identificar sessão e marcar plano atual se logado
-    document.addEventListener('DOMContentLoaded', () => {
+    let isViewerAdmin = false;
+    let currentViewerPlan = 'free';
+
+    document.addEventListener('DOMContentLoaded', async () => {
       // Ajuste para links locais ou Vercel
       const isLocal = (window.location.protocol === 'file:' || window.location.port !== '' || window.location.pathname.endsWith('.html'));
       if (isLocal) {
         document.querySelectorAll('a[href="/app"]').forEach(el => el.setAttribute('href', 'app.html'));
+        document.querySelectorAll('a[href="/app#admin"]').forEach(el => el.setAttribute('href', 'app.html#admin'));
         document.querySelectorAll('a[href="/"]').forEach(el => el.setAttribute('href', 'index.html'));
       }
 
-      // Tentar recuperar plano ativo do cache local seguro
-      try {
-        const cachedSub = localStorage.getItem('titannovafit_subscription');
-        if (cachedSub) {
-          const parsed = JSON.parse(cachedSub);
-          const code = (parsed.plan_code || 'free').toLowerCase();
-          highlightCurrentPlan(code);
-        } else {
-          highlightCurrentPlan('free');
-        }
-      } catch (_) {
-        highlightCurrentPlan('free');
-      }
+      await checkUserPlanState();
     });
+
+    async function checkUserPlanState() {
+      // 1. Tentar ler do Supabase com sessão ativa
+      try {
+        if (_supabase) {
+          const { data: sessionData } = await _supabase.auth.getSession();
+          const user = sessionData?.session?.user;
+          if (user) {
+            // Verificar admin
+            try {
+              const { data: ent } = await _supabase.rpc('get_my_entitlements');
+              if (ent) {
+                if (ent.is_admin) {
+                  isViewerAdmin = true;
+                } else if (ent.plan_code) {
+                  currentViewerPlan = ent.plan_code.toLowerCase();
+                }
+              }
+            } catch (_) {
+              const { data: adminBool } = await _supabase.rpc('is_admin');
+              if (adminBool === true) isViewerAdmin = true;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[Planos check session warning]:', e);
+      }
+
+      // 2. Fallback de cache local
+      if (!isViewerAdmin) {
+        try {
+          const cachedSub = localStorage.getItem('titannovafit_subscription');
+          if (cachedSub) {
+            const parsed = JSON.parse(cachedSub);
+            if (parsed.is_admin) {
+              isViewerAdmin = true;
+            } else if (parsed.plan_code) {
+              currentViewerPlan = (parsed.plan_code || 'free').toLowerCase();
+            }
+          }
+        } catch (_) {}
+      }
+
+      // 3. Atualizar UI
+      if (isViewerAdmin) {
+        const banner = document.getElementById('adminPlanNoticeBanner');
+        if (banner) banner.style.display = 'block';
+
+        document.querySelectorAll('.plan-action-btn').forEach(btn => {
+          btn.innerHTML = '<span>Acesso Total Admin 👑</span>';
+          btn.style.opacity = '0.9';
+          btn.style.background = 'rgba(255, 215, 0, 0.15)';
+          btn.style.borderColor = 'rgba(255, 215, 0, 0.5)';
+          btn.style.color = '#ffd700';
+          btn.onclick = () => {
+            window.location.href = isLocalHref('/app#admin');
+          };
+        });
+      } else {
+        highlightCurrentPlan(currentViewerPlan);
+      }
+    }
+
+    function isLocalHref(url) {
+      const isLocal = (window.location.protocol === 'file:' || window.location.port !== '' || window.location.pathname.endsWith('.html'));
+      if (isLocal) {
+        if (url === '/app#admin') return 'app.html#admin';
+        if (url === '/app') return 'app.html';
+        if (url === '/') return 'index.html';
+      }
+      return url;
+    }
 
     function highlightCurrentPlan(planCode) {
       document.querySelectorAll('.current-plan-badge').forEach(b => b.style.display = 'none');
-      if (planCode === 'gold') {
-        const el = document.getElementById('badgeCurrentGold');
-        if (el) el.style.display = 'inline-block';
-      } else if (planCode === 'silver') {
-        const el = document.getElementById('badgeCurrentSilver');
-        if (el) el.style.display = 'inline-block';
-      } else if (planCode === 'bronze') {
-        const el = document.getElementById('badgeCurrentBronze');
-        if (el) el.style.display = 'inline-block';
-      } else {
-        const el = document.getElementById('badgeCurrentFree');
-        if (el) el.style.display = 'inline-block';
+      const badgeIdMap = {
+        'gold': 'badgeCurrentGold',
+        'silver': 'badgeCurrentSilver',
+        'bronze': 'badgeCurrentBronze',
+        'free': 'badgeCurrentFree'
+      };
+      const activeId = badgeIdMap[planCode] || 'badgeCurrentFree';
+      const el = document.getElementById(activeId);
+      if (el) el.style.display = 'inline-block';
+    }
+
+    function handleSelectPlan(planCode) {
+      if (isViewerAdmin) {
+        alert('👑 Você possui Acesso Total de Administrador!\n\nComo administrador, você não precisa assinar nem pagar por nenhum plano. Todos os recursos já estão permanentemente desbloqueados.');
+        return;
+      }
+
+      if (planCode === 'free') {
+        if (currentViewerPlan === 'free') {
+          alert('🌱 Você já está no Plano Grátis!\n\nSuas 3 fichas de treino essenciais e seu histórico estão ativos.');
+          return;
+        }
+        // Se usuário estiver em plano pago, abrir modal de confirmação de downgrade
+        openModalDowngradeFree();
+        return;
+      }
+
+      // Planos pagos: Bronze, Prata, Gold
+      if (currentViewerPlan === planCode) {
+        alert(`Você já está com o Plano ${planCode.toUpperCase()} ativo!`);
+        return;
+      }
+
+      openModalPaidPlanSoon(planCode);
+    }
+
+    function openModalDowngradeFree() {
+      const m = document.getElementById('modalDowngradeFree');
+      if (m) m.style.display = 'flex';
+    }
+
+    function closeModalDowngradeFree() {
+      const m = document.getElementById('modalDowngradeFree');
+      if (m) m.style.display = 'none';
+    }
+
+    async function executeDowngradeToFree() {
+      const btn = document.getElementById('btnConfirmDowngrade');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = 'Processando...';
+      }
+
+      try {
+        let token = null;
+        if (_supabase) {
+          const session = (await _supabase.auth.getSession())?.data?.session;
+          token = session?.access_token;
+        }
+
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch('/api/subscriptions?action=choose_free', {
+          method: 'POST',
+          headers
+        });
+        const data = await res.json();
+
+        // Atualizar cache local seguro
+        const updatedSub = {
+          plan_code: 'free',
+          plan_name: 'Grátis',
+          status: 'active',
+          billing_cycle: 'free',
+          limits: { workout_limit: 3, history_days: 30 }
+        };
+        localStorage.setItem('titannovafit_subscription', JSON.stringify(updatedSub));
+        currentViewerPlan = 'free';
+        highlightCurrentPlan('free');
+
+        closeModalDowngradeFree();
+        alert('✅ Seu plano foi alterado para o Plano Grátis com sucesso! Seus treinos e histórico continuam 100% preservados.');
+      } catch (err) {
+        console.error('[Downgrade Error]:', err);
+        // Fallback gracioso
+        localStorage.setItem('titannovafit_subscription', JSON.stringify({
+          plan_code: 'free',
+          plan_name: 'Grátis',
+          status: 'active'
+        }));
+        currentViewerPlan = 'free';
+        highlightCurrentPlan('free');
+        closeModalDowngradeFree();
+        alert('✅ Plano Grátis ativado.');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerText = 'Confirmar Grátis';
+        }
       }
     }
+
+    function openModalPaidPlanSoon(planCode) {
+      const modal = document.getElementById('modalPaidPlanSoon');
+      const emojiEl = document.getElementById('modalPaidEmoji');
+      const titleEl = document.getElementById('modalPaidTitle');
+      const badgeEl = document.getElementById('modalPaidBadge');
+
+      const meta = {
+        'bronze': { name: 'Bronze', emoji: '🥉', color: '#CD7F32' },
+        'silver': { name: 'Prata', emoji: '🥈', color: '#C0C0C0' },
+        'gold': { name: 'Gold', emoji: '👑', color: '#FFD700' }
+      };
+      const info = meta[planCode] || meta['silver'];
+
+      if (emojiEl) emojiEl.innerText = info.emoji;
+      if (titleEl) titleEl.innerText = `Plano ${info.name} • Assinaturas em Breve`;
+      if (badgeEl) {
+        badgeEl.innerText = `Plano ${info.name}`;
+        badgeEl.style.color = info.color;
+      }
+
+      if (modal) modal.style.display = 'flex';
+    }
+
+    function closeModalPaidPlanSoon() {
+      const modal = document.getElementById('modalPaidPlanSoon');
+      if (modal) modal.style.display = 'none';
+    }
   </script>
+
 </body>
 </html>
