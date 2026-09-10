@@ -519,6 +519,51 @@
     .footer-links a:hover {
       color: var(--accent-cyan);
     }
+  
+    /* Role Selector Toggle */
+    .role-toggle-container {
+      display: flex;
+      justify-content: center;
+      margin: 28px 0 20px 0;
+    }
+
+    .role-toggle-box {
+      display: inline-flex;
+      background: #161a24;
+      border: 1px solid var(--border-cyan);
+      padding: 5px;
+      border-radius: 40px;
+      gap: 6px;
+      box-shadow: 0 4px 20px rgba(0, 210, 255, 0.15);
+    }
+
+    .role-toggle-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-grey);
+      font-size: 14px;
+      font-weight: 800;
+      padding: 10px 24px;
+      border-radius: 30px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .role-toggle-btn.active {
+      background: linear-gradient(135deg, #00d2ff 0%, #1E88E5 100%);
+      color: #ffffff;
+      box-shadow: 0 2px 12px rgba(0, 210, 255, 0.4);
+    }
+
+    .role-toggle-btn.trainer-active {
+      background: linear-gradient(135deg, #ffd700 0%, #ff9800 100%);
+      color: #0c0e14;
+      box-shadow: 0 2px 12px rgba(255, 215, 0, 0.4);
+    }
+
   </style>
 </head>
 <body>
@@ -558,7 +603,21 @@
     </section>
 
     <!-- CARDS DOS 4 PLANOS -->
-    <section class="plans-grid">
+    
+      <!-- SELETOR DE MODALIDADE: ATLETA vs PERSONAL TRAINER -->
+      <div class="role-toggle-container">
+        <div class="role-toggle-box">
+          <button id="btnRoleAthlete" class="role-toggle-btn active" onclick="switchPlanRoleView('athlete')">
+            <span>🏃‍♂️</span> Para Atletas
+          </button>
+          <button id="btnRoleTrainer" class="role-toggle-btn" onclick="switchPlanRoleView('trainer')">
+            <span>💪</span> Para Personal Trainers
+          </button>
+        </div>
+      </div>
+
+    <!-- CARDS DOS 4 PLANOS (MODO ATLETA) -->
+    <section class="plans-grid" id="athletePlansGrid">
       <!-- 1. GRÁTIS -->
       <div class="plan-card" id="cardPlanFree" style="border-color: rgba(0, 210, 255, 0.3);">
         <div class="current-plan-badge" id="badgeCurrentFree">Seu plano atual</div>
@@ -689,7 +748,7 @@
         </button>
       </div>
 
-      <!-- 4. GOLD -->
+      <!-- 4. GOLD ATLETA -->
       <div class="plan-card" id="cardPlanGold" style="border-color: rgba(255, 215, 0, 0.4);">
         <div class="plan-badge-tag" style="position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: #FFD700; color: #0c0e14; padding: 4px 14px; border-radius: 20px; font-size: 11px; font-weight: 800; text-transform: uppercase;">Experiência completa</div>
         <div class="current-plan-badge" id="badgeCurrentGold">Seu plano atual</div>
@@ -726,6 +785,136 @@
 
         <button class="plan-action-btn" onclick="alert('O Plano Gold estará disponível para contratação em breve!\n\nNo momento, utilize todos os recursos essenciais do Plano Grátis.');" style="cursor: pointer; background: #FFD700; color: #0c0e14; font-weight: 800; border: none;">
           <span>Escolher Gold</span>
+        </button>
+      </div>
+    </section>
+
+    
+    <!-- CARDS DOS 4 PLANOS (MODO PERSONAL TRAINER) -->
+    <section class="plans-grid" id="trainerPlansGrid" style="display: none;">
+      <!-- 1. PERSONAL GRÁTIS -->
+      <div class="plan-card" style="border-color: rgba(0, 210, 255, 0.3);">
+        <div class="plan-header">
+          <div class="plan-name">
+            <span style="color: var(--accent-cyan);">Grátis</span>
+            <span style="font-size: 20px;">🌱</span>
+          </div>
+          <p class="plan-desc">Comece a prescrever treinos e atender seus primeiros alunos.</p>
+        </div>
+        <div class="plan-price-wrapper">
+          <div class="plan-price" style="font-size: 32px; color: var(--accent-cyan);">
+            R$ 0 <span class="period">/mês</span>
+          </div>
+          <div class="plan-price-sub">Acesso gratuito para começar sua consultoria</div>
+        </div>
+        <ul class="features-list">
+          <li><span class="icon check">✓</span> <span>Até <strong>2 alunos ativos</strong></span></li>
+          <li><span class="icon check">✓</span> <span>Até <strong>5 modelos de treino</strong></span></li>
+          <li><span class="icon check">✓</span> <span>Convite rápido por link seguro</span></li>
+          <li><span class="icon check">✓</span> <span>Compartilhamento direto pelo WhatsApp</span></li>
+          <li><span class="icon check">✓</span> <span>Atribuição básica de fichas</span></li>
+          <li><span class="icon check">✓</span> <span>Biblioteca completa de exercícios</span></li>
+          <li><span class="icon check">✓</span> <span>Comentários na ficha atribuída</span></li>
+          <li><span class="icon check">✓</span> <span>Sincronização em nuvem e suporte offline</span></li>
+        </ul>
+        <a href="/app" class="plan-action-btn" style="text-align: center; text-decoration: none; display: flex; align-items: center; justify-content: center; background: var(--accent-blue); color: #fff; cursor: pointer;">
+          <span>Começar como Personal</span>
+        </a>
+      </div>
+
+      <!-- 2. PERSONAL BRONZE -->
+      <div class="plan-card" style="border-color: rgba(205, 127, 50, 0.4);">
+        <div class="plan-badge-tag" style="position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: #CD7F32; color: #fff; padding: 4px 14px; border-radius: 20px; font-size: 11px; font-weight: 800; text-transform: uppercase;">Para Treinadores Ativos</div>
+        <div class="plan-header">
+          <div class="plan-name">
+            <span style="color: #CD7F32;">Bronze</span>
+            <span style="font-size: 20px;">🥉</span>
+          </div>
+          <p class="plan-desc">Mais liberdade para gerenciar sua carteira regular de alunos.</p>
+        </div>
+        <div class="plan-price-wrapper">
+          <div class="plan-price" style="font-size: 32px; color: #CD7F32;">
+            R$ 49,90 <span class="period">/mês</span>
+          </div>
+          <div class="plan-price-sub">Em breve para contratação automática</div>
+        </div>
+        <ul class="features-list">
+          <li style="color: #fff; font-weight: 700;">Tudo do plano Grátis, mais:</li>
+          <li><span class="icon check">✓</span> <span>Até <strong>10 alunos ativos</strong></span></li>
+          <li><span class="icon check">✓</span> <span><strong>Modelos de treino ilimitados</strong></span></li>
+          <li><span class="icon check">✓</span> <span>Histórico completo de sessões dos alunos</span></li>
+          <li><span class="icon check">✓</span> <span>Exercícios personalizados exclusivos</span></li>
+          <li><span class="icon check">✓</span> <span>Exportação de relatórios dos alunos</span></li>
+          <li><span class="icon check">✓</span> <span>Zero anúncios</span></li>
+        </ul>
+        <button class="plan-action-btn" onclick="alert('Plano Bronze para Personal Trainers disponível em breve!
+Cadastre-se no plano Grátis para utilizar todas as ferramentas.');" style="cursor: pointer; border: 1px solid #CD7F32; color: #CD7F32; background: transparent;">
+          <span>Escolher Bronze Personal</span>
+        </button>
+      </div>
+
+      <!-- 3. PERSONAL PRATA (Mais Escolhido) -->
+      <div class="plan-card featured" style="border-color: #C0C0C0; background: linear-gradient(180deg, rgba(192, 192, 192, 0.08) 0%, rgba(20, 24, 33, 0.95) 100%);">
+        <div class="featured-badge" style="background: #C0C0C0; color: #0c0e14; font-weight: 800;">Mais Escolhido por Personais</div>
+        <div class="plan-header">
+          <div class="plan-name">
+            <span style="color: #E0E0E0;">Prata</span>
+            <span style="font-size: 20px;">🥈</span>
+          </div>
+          <p class="plan-desc">Análise aprofundada de evolução e prescrição escalável.</p>
+        </div>
+        <div class="plan-price-wrapper">
+          <div class="plan-price" style="font-size: 32px; color: #E0E0E0;">
+            R$ 89,90 <span class="period">/mês</span>
+          </div>
+          <div class="plan-price-sub">Em breve para contratação automática</div>
+        </div>
+        <ul class="features-list">
+          <li style="color: #fff; font-weight: 700;">Tudo do plano Bronze, mais:</li>
+          <li><span class="icon check">✓</span> <span>Até <strong>30 alunos ativos</strong></span></li>
+          <li><span class="icon check">✓</span> <span><strong>Gráficos de evolução por aluno</strong></span></li>
+          <li><span class="icon check">✓</span> <span>Relatórios técnicos de adesão e carga</span></li>
+          <li><span class="icon check">✓</span> <span>Comparação de desempenho entre sessões</span></li>
+          <li><span class="icon check">✓</span> <span>Biblioteca profissional completa</span></li>
+          <li><span class="icon check">✓</span> <span>Atribuição de fichas para múltiplos alunos</span></li>
+          <li><span class="icon check">✓</span> <span>Acompanhamento de recordes pessoais (PRs)</span></li>
+        </ul>
+        <button class="plan-action-btn active-choice" onclick="alert('Plano Prata para Personal Trainers disponível em breve!
+Cadastre-se no plano Grátis para utilizar todas as ferramentas.');" style="cursor: pointer; background: #C0C0C0; color: #0c0e14; font-weight: 800; border: none;">
+          <span>Escolher Prata Personal</span>
+        </button>
+      </div>
+
+      <!-- 4. PERSONAL GOLD -->
+      <div class="plan-card" style="border-color: rgba(255, 215, 0, 0.4);">
+        <div class="plan-badge-tag" style="position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: #FFD700; color: #0c0e14; padding: 4px 14px; border-radius: 20px; font-size: 11px; font-weight: 800; text-transform: uppercase;">Alta Performance & Equipe</div>
+        <div class="plan-header">
+          <div class="plan-name">
+            <span style="color: #FFD700;">Gold</span>
+            <span style="font-size: 20px;">👑</span>
+          </div>
+          <p class="plan-desc">Gestão em larga escala com identidade profissional completa.</p>
+        </div>
+        <div class="plan-price-wrapper">
+          <div class="plan-price" style="font-size: 32px; color: #FFD700;">
+            R$ 149,90 <span class="period">/mês</span>
+          </div>
+          <div class="plan-price-sub">Em breve para contratação automática</div>
+        </div>
+        <ul class="features-list">
+          <li style="color: #fff; font-weight: 700;">Tudo do plano Prata, mais:</li>
+          <li><span class="icon check">✓</span> <span>Até <strong>100 alunos ativos</strong></span></li>
+          <li><span class="icon check">✓</span> <span><strong>Painel profissional completo de consultoria</strong></span></li>
+          <li><span class="icon check">✓</span> <span>Identidade profissional e personalização de marca</span></li>
+          <li><span class="icon check">✓</span> <span>Relatórios avançados consolidados em PDF</span></li>
+          <li><span class="icon check">✓</span> <span>Atribuição em lote para grupos de alunos</span></li>
+          <li><span class="icon check">✓</span> <span>Suporte prioritário via WhatsApp direto</span></li>
+          <li><span class="icon coming">⏳</span> <span>Recursos futuros de equipe e assistentes <span class="badge-soon">Em breve</span></span></li>
+          <li><span class="icon coming">⏳</span> <span>Integrações com wearables e balanças <span class="badge-soon">Em breve</span></span></li>
+        </ul>
+        <button class="plan-action-btn" onclick="alert('Plano Gold para Personal Trainers disponível em breve!
+Cadastre-se no plano Grátis para utilizar todas as ferramentas.');" style="cursor: pointer; background: #FFD700; color: #0c0e14; font-weight: 800; border: none;">
+          <span>Escolher Gold Personal</span>
         </button>
       </div>
     </section>
@@ -818,6 +1007,30 @@
   </footer>
 
   <script>
+
+    let currentPlanRole = 'athlete';
+    function switchPlanRoleView(role) {
+      currentPlanRole = role;
+      const btnAth = document.getElementById('btnRoleAthlete');
+      const btnTra = document.getElementById('btnRoleTrainer');
+      const gridAth = document.getElementById('athletePlansGrid');
+      const gridTra = document.getElementById('trainerPlansGrid');
+
+      if (role === 'trainer') {
+        if (btnAth) btnAth.classList.remove('active');
+        if (btnTra) {
+          btnTra.classList.add('trainer-active');
+        }
+        if (gridAth) gridAth.style.display = 'none';
+        if (gridTra) gridTra.style.display = 'grid';
+      } else {
+        if (btnTra) btnTra.classList.remove('trainer-active');
+        if (btnAth) btnAth.classList.add('active');
+        if (gridTra) gridTra.style.display = 'none';
+        if (gridAth) gridAth.style.display = 'grid';
+      }
+    }
+
     let currentBilling = 'monthly';
 
     function setBillingCycle(cycle) {

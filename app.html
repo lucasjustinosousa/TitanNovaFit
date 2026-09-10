@@ -1038,8 +1038,13 @@
         <img src="assets/icons/logo.png" alt="TitanNova Fit" style="width: 28px; height: 28px; border-radius: 7px; object-fit: cover; box-shadow: 0 2px 8px rgba(0,210,255,0.35);">
         TITANNOVA <span>FIT</span>
       </div>
-      <div id="connectionStatus" class="sync-pill-idle">
-        ● Nuvem Conectada
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <button id="headerRoleToggleBtn" onclick="toggleActiveRoleMode()" class="btn-role-badge" style="display: none; align-items: center; gap: 6px; background: rgba(0, 210, 255, 0.12); border: 1px solid var(--accent-cyan); color: var(--accent-cyan); border-radius: 20px; padding: 4px 10px; font-size: 11px; font-weight: 800; cursor: pointer; transition: all 0.2s;" title="Alternar visão Atleta / Personal Trainer">
+          <span id="headerRoleIcon">🏃</span> <span id="headerRoleLabel">Atleta</span>
+        </button>
+        <div id="connectionStatus" class="sync-pill-idle">
+          ● Nuvem Conectada
+        </div>
       </div>
     </div>
 
@@ -1054,6 +1059,7 @@
       </div>
       <div style="display: flex; justify-content: space-around; align-items: center; font-size: 12px; gap: 2px;">
         <button onclick="adjustRestTimer(-15)" class="btn-text" style="padding: 4px 6px;">-15s</button>
+        <button id="restTimerPauseBtn" onclick="togglePauseRestTimer()" class="btn-text" style="padding: 4px 6px; color: #ffd700; font-weight: 700;">⏸️ Pausar</button>
         <button onclick="adjustRestTimer(15)" class="btn-text" style="padding: 4px 6px; color: var(--accent-cyan);">+15s</button>
         <button onclick="adjustRestTimer(30)" class="btn-text" style="padding: 4px 6px; color: var(--accent-cyan);">+30s</button>
         <button onclick="adjustRestTimer(60)" class="btn-text" style="padding: 4px 6px; color: var(--accent-cyan);">+1min</button>
@@ -1413,6 +1419,36 @@
           <p id="homeHeroSubtitle" style="font-size: 12px; opacity: 0.9; margin-top: 4px;">5 exercícios • ~50 min de duração</p>
           <button id="homeHeroBtn" onclick="startActiveWorkout('treino_default_a')" class="btn btn-success" style="margin-top: 16px; box-shadow: 0 4px 16px rgba(76,175,80,0.4);">
             ▶ INICIAR TREINO AGORA
+          </button>
+        </div>
+
+        <!-- Card de Sequência e Ofensiva (Streak) -->
+        <div class="card" id="homeStreakCard" style="margin-bottom: 14px; background: linear-gradient(135deg, rgba(255,107,0,0.12) 0%, rgba(255,179,0,0.06) 100%); border: 1px solid rgba(255,107,0,0.35); border-radius: 14px; padding: 12px 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div style="font-size: 26px; line-height: 1;">🔥</div>
+              <div>
+                <div id="homeStreakCount" style="font-size: 15px; font-weight: 900; color: white;">0 Dias Seguidos</div>
+                <div id="homeStreakMsg" style="font-size: 11px; color: var(--text-grey); margin-top: 2px;">Treine hoje para iniciar sua sequência de treinos!</div>
+              </div>
+            </div>
+            <span id="homeStreakBadge" style="font-size: 10px; font-weight: 800; background: rgba(255,107,0,0.25); color: #ff9800; padding: 3px 8px; border-radius: 8px; text-transform: uppercase;">Consistência</span>
+          </div>
+        </div>
+
+        <!-- Card de Treinos Prescritos pelo Personal Trainer (Atleta) -->
+        <div class="card" id="homeAssignedWorkoutsCard" style="display: none; margin-bottom: 14px; background: linear-gradient(135deg, rgba(0,210,255,0.12) 0%, rgba(30,136,229,0.06) 100%); border-left: 4px solid var(--accent-cyan); border-radius: 14px; padding: 14px 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 18px;">👨‍🏫</span>
+              <h4 style="font-size: 13px; font-weight: 800; color: var(--accent-cyan); margin: 0; text-transform: uppercase; letter-spacing: 0.5px;">Ficha Prescrita pelo Personal</h4>
+            </div>
+            <span id="homeAssignedBadge" style="font-size: 9.5px; font-weight: 800; background: rgba(0,210,255,0.2); color: var(--accent-cyan); padding: 2px 7px; border-radius: 6px;">Nova Ficha</span>
+          </div>
+          <h4 id="homeAssignedTitle" style="font-size: 16px; font-weight: 800; color: white; margin: 4px 0 2px 0;">Treino Personalizado</h4>
+          <p id="homeAssignedTrainerName" style="font-size: 11.5px; color: var(--text-grey); margin: 0 0 10px 0;">Prescrito por seu professor</p>
+          <button id="homeAssignedStartBtn" onclick="startAssignedWorkoutFromHome()" class="btn btn-primary" style="padding: 8px 14px; font-size: 12px; font-weight: 800; width: 100%;">
+            ▶ INICIAR FICHA DO PERSONAL
           </button>
         </div>
 
@@ -1938,12 +1974,14 @@
 
           <!-- Quadro de Recordes Pessoais -->
           <div class="card" style="padding: 16px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
               <h4 style="font-size: 14px; font-weight: 800; color: white; margin: 0; display: flex; align-items: center; gap: 6px;">
                 <span>🔥</span> Maiores Cargas Registradas (PRs)
               </h4>
               <button onclick="exportHistoryData('json')" class="btn btn-text" style="padding: 0; font-size: 11px; color: var(--accent-cyan); text-decoration: underline;">Exportar JSON</button>
             </div>
+            <p style="font-size: 11px; color: var(--text-grey); margin: 0 0 10px 0;">Toque em qualquer recorde para visualizar a evolução gráfica do exercício.</p>
+            <input type="text" id="prSearchInput" oninput="filterPersonalRecords(this.value)" placeholder="🔍 Filtrar por exercício..." class="form-input" style="padding: 7px 10px; font-size: 11.5px; margin-bottom: 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--divider); border-radius: 8px; color: white; width: 100%;">
             <div id="personalRecordsContainer" style="display: flex; flex-direction: column; gap: 8px;">
               <!-- Lista de PRs por exercício -->
             </div>
@@ -2001,6 +2039,15 @@
           <button id="tabStudentsHistoryBtn" onclick="switchTrainerStudentsTab('history')" style="flex: 1; padding: 8px 4px; border-radius: 8px; border: none; font-size: 12px; font-weight: 800; cursor: pointer; background: transparent; color: var(--text-grey);">
             Histórico
           </button>
+        </div>
+
+        <!-- Chips de Filtro Rápido de Alunos -->
+        <div style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 12px;" id="trainerFilterChipsContainer">
+          <button type="button" class="chip-filter active" onclick="setTrainerStudentFilter('all', this)" style="padding: 4px 10px; font-size: 11px; border-radius: 20px; border: 1px solid var(--accent-cyan); background: rgba(0,210,255,0.15); color: var(--accent-cyan); font-weight: 700; cursor: pointer; white-space: nowrap;">Todos</button>
+          <button type="button" class="chip-filter" onclick="setTrainerStudentFilter('active', this)" style="padding: 4px 10px; font-size: 11px; border-radius: 20px; border: 1px solid var(--divider); background: transparent; color: var(--text-grey); font-weight: 700; cursor: pointer; white-space: nowrap;">Ativos</button>
+          <button type="button" class="chip-filter" onclick="setTrainerStudentFilter('no_workout', this)" style="padding: 4px 10px; font-size: 11px; border-radius: 20px; border: 1px solid var(--divider); background: transparent; color: var(--text-grey); font-weight: 700; cursor: pointer; white-space: nowrap;">Sem Ficha</button>
+          <button type="button" class="chip-filter" onclick="setTrainerStudentFilter('recent', this)" style="padding: 4px 10px; font-size: 11px; border-radius: 20px; border: 1px solid var(--divider); background: transparent; color: var(--text-grey); font-weight: 700; cursor: pointer; white-space: nowrap;">Recentes (7d)</button>
+          <button type="button" class="chip-filter" onclick="setTrainerStudentFilter('invited', this)" style="padding: 4px 10px; font-size: 11px; border-radius: 20px; border: 1px solid var(--divider); background: transparent; color: var(--text-grey); font-weight: 700; cursor: pointer; white-space: nowrap;">Convites</button>
         </div>
 
         <!-- Lista de Alunos -->
@@ -3531,6 +3578,228 @@
         </a>
         <button type="button" onclick="closeUpgradePlanModal()" class="btn btn-outline" style="padding: 10px; font-size: 13px; color: var(--text-grey); cursor: pointer; border-radius: 12px;">
           Agora não
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE SUBSTITUIÇÃO DE EXERCÍCIO NO TREINO ATIVO -->
+  <div id="modalReplaceActiveExercise" class="modal-overlay" style="z-index: 100005; display: none;">
+    <div class="modal-card" style="max-width: 480px; width: 94%; max-height: 85vh; display: flex; flex-direction: column; padding: 20px; background: #121620; border: 2px solid var(--accent-cyan); border-radius: 20px; box-shadow: 0 0 50px rgba(0,210,255,0.25);">
+      <div class="modal-header" style="padding-bottom: 10px; border-bottom: 1px solid var(--divider); display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <h3 style="font-size: 16px; font-weight: 900; color: white; margin: 0;">🔄 Substituir Exercício</h3>
+          <p id="replaceActiveExerciseSubtitle" style="font-size: 11px; color: var(--text-grey); margin: 2px 0 0 0;">Selecione uma alternativa equivalente</p>
+        </div>
+        <button onclick="closeReplaceActiveExerciseModal()" class="btn-micro" style="padding: 4px 8px; font-size: 14px;">✕</button>
+      </div>
+      <div style="padding: 10px 0;">
+        <input type="text" id="replaceActiveExerciseSearch" oninput="filterReplaceActiveExerciseList()" class="form-input" style="padding: 8px 12px; font-size: 12px; margin-bottom: 8px;" placeholder="🔍 Buscar exercício substituto...">
+      </div>
+      <div id="replaceActiveExerciseListContainer" class="modal-body" style="overflow-y: auto; max-height: 48vh; display: flex; flex-direction: column; gap: 8px; padding-right: 4px;">
+        <!-- Lista dinâmica -->
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE ONBOARDING INICIAL DO ATLETA -->
+  <div id="modalAthleteOnboarding" class="modal-overlay" style="z-index: 100004; display: none;">
+    <div class="modal-card" style="max-width: 520px; width: 94%; max-height: 90vh; display: flex; flex-direction: column; padding: 22px; background: #121620; border: 2px solid var(--accent-cyan); border-radius: 20px; box-shadow: 0 0 50px rgba(0,210,255,0.25);">
+      <div class="modal-header" style="padding-bottom: 12px; border-bottom: 1px solid var(--divider);">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 26px;">🏃</span>
+          <div>
+            <h3 style="font-size: 17px; font-weight: 900; color: white; margin: 0;">Bem-vindo ao TitanNova Fit!</h3>
+            <p style="font-size: 11px; color: var(--text-grey); margin: 2px 0 0 0;">Configuração inicial da sua rotina de atleta</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-body" style="padding: 16px 2px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px;">
+        <!-- 1. Objetivo Principal -->
+        <div class="form-group">
+          <label class="form-label" style="font-weight: 800; color: white;">1. Qual é o seu objetivo principal?</label>
+          <select id="onboardingAthleteGoal" class="form-input">
+            <option value="Hipertrofia">💪 Hipertrofia (Ganho de massa muscular)</option>
+            <option value="Emagrecimento">🔥 Emagrecimento & Definição</option>
+            <option value="Forca">⚡ Força Máxima</option>
+            <option value="Resistencia">🏃 Resistência e Condicionamento</option>
+            <option value="Saude">🧘 Saúde Geral e Mobilidade</option>
+          </select>
+        </div>
+
+        <!-- 2. Nível de Experiência -->
+        <div class="form-group">
+          <label class="form-label" style="font-weight: 800; color: white;">2. Qual seu nível de experiência com musculação?</label>
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+            <label style="background: rgba(255,255,255,0.04); border: 1px solid var(--divider); padding: 10px 6px; border-radius: 10px; text-align: center; cursor: pointer; font-size: 11.5px; font-weight: 700; color: white;">
+              <input type="radio" name="onboardingLevel" value="Iniciante" checked style="margin-bottom: 4px; display: block; margin-left: auto; margin-right: auto;">
+              Iniciante<br><span style="font-size: 9.5px; color: var(--text-grey); font-weight: 400;">&lt; 6 meses</span>
+            </label>
+            <label style="background: rgba(255,255,255,0.04); border: 1px solid var(--divider); padding: 10px 6px; border-radius: 10px; text-align: center; cursor: pointer; font-size: 11.5px; font-weight: 700; color: white;">
+              <input type="radio" name="onboardingLevel" value="Intermediário" style="margin-bottom: 4px; display: block; margin-left: auto; margin-right: auto;">
+              Intermediário<br><span style="font-size: 9.5px; color: var(--text-grey); font-weight: 400;">6m a 2 anos</span>
+            </label>
+            <label style="background: rgba(255,255,255,0.04); border: 1px solid var(--divider); padding: 10px 6px; border-radius: 10px; text-align: center; cursor: pointer; font-size: 11.5px; font-weight: 700; color: white;">
+              <input type="radio" name="onboardingLevel" value="Avançado" style="margin-bottom: 4px; display: block; margin-left: auto; margin-right: auto;">
+              Avançado<br><span style="font-size: 9.5px; color: var(--text-grey); font-weight: 400;">2+ anos</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 3. Dias por semana -->
+        <div class="form-group">
+          <label class="form-label" style="font-weight: 800; color: white;">3. Quantos dias pretende treinar por semana?</label>
+          <select id="onboardingAthleteDays" class="form-input">
+            <option value="2">2 dias por semana</option>
+            <option value="3" selected>3 dias por semana (Recomendado)</option>
+            <option value="4">4 dias por semana (Divisão AB ou ABCD)</option>
+            <option value="5">5 dias por semana (Divisão ABCDE)</option>
+            <option value="6">6 dias por semana (PPL Push/Pull/Legs)</option>
+          </select>
+        </div>
+
+        <!-- 4. Local e Equipamentos -->
+        <div class="form-group">
+          <label class="form-label" style="font-weight: 800; color: white;">4. Onde você treina e quais equipamentos tem acesso?</label>
+          <select id="onboardingAthleteLocation" class="form-input" style="margin-bottom: 8px;">
+            <option value="Academia Completa" selected>🏋️ Academia comercial completa</option>
+            <option value="Academia Predio">🏢 Academia de prédio ou condomínio</option>
+            <option value="Casa Halteres">🏠 Em casa com halteres / barras</option>
+            <option value="Peso Corporal">🤸 Apenas peso corporal / Calistenia</option>
+          </select>
+        </div>
+
+        <!-- 5. Unidade e Descanso -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="form-group">
+            <label class="form-label" style="font-size: 11px; font-weight: 700;">Unidade de Carga</label>
+            <select id="onboardingAthleteUnit" class="form-input" style="padding: 8px;">
+              <option value="kg" selected>Quilogramas (kg)</option>
+              <option value="lb">Libras (lb)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" style="font-size: 11px; font-weight: 700;">Descanso Padrão</label>
+            <select id="onboardingAthleteRest" class="form-input" style="padding: 8px;">
+              <option value="45">45 segundos</option>
+              <option value="60" selected>60 segundos</option>
+              <option value="90">90 segundos</option>
+              <option value="120">120 segundos</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 6. Escolha do Caminho Inicial -->
+        <div class="form-group" style="background: rgba(0,210,255,0.05); border: 1px solid rgba(0,210,255,0.25); border-radius: 12px; padding: 12px;">
+          <label class="form-label" style="font-weight: 800; color: var(--accent-cyan); margin-bottom: 8px;">5. Como deseja iniciar no app hoje?</label>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: white; cursor: pointer;">
+              <input type="radio" name="onboardingPath" value="recommended" checked>
+              <span><strong>Escolher um treino recomendado</strong> (Fichas prontas A/B/C)</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: white; cursor: pointer;">
+              <input type="radio" name="onboardingPath" value="custom">
+              <span><strong>Montar meu próprio treino</strong> (Criar ficha personalizada)</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: white; cursor: pointer;">
+              <input type="radio" name="onboardingPath" value="trainer">
+              <span><strong>Receber treino de um personal</strong> (Usar link do meu professor)</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Disclaimer Legal Obrigatório -->
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--divider); border-radius: 10px; padding: 10px; font-size: 10.5px; color: var(--text-grey); line-height: 1.4;">
+          ⚖️ <em>Aviso importante: Suas respostas podem ser editadas a qualquer momento no seu Perfil. Elas não configuram diagnóstico médico, consulta clínica ou garantia de resultados físicos. Consulte um profissional de saúde antes de iniciar atividades intensas.</em>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="padding-top: 12px; border-top: 1px solid var(--divider);">
+        <button type="button" onclick="submitAthleteOnboarding()" class="btn btn-primary" style="width: 100%; font-weight: 900; padding: 12px; font-size: 13px;">
+          🚀 SALVAR PREFERÊNCIAS E COMEÇAR
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE ONBOARDING INICIAL DO PERSONAL TRAINER -->
+  <div id="modalTrainerOnboarding" class="modal-overlay" style="z-index: 100004; display: none;">
+    <div class="modal-card" style="max-width: 520px; width: 94%; max-height: 90vh; display: flex; flex-direction: column; padding: 22px; background: #121620; border: 2px solid #ffd700; border-radius: 20px; box-shadow: 0 0 50px rgba(255,215,0,0.25);">
+      <div class="modal-header" style="padding-bottom: 12px; border-bottom: 1px solid var(--divider);">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 26px;">💪</span>
+          <div>
+            <h3 style="font-size: 17px; font-weight: 900; color: white; margin: 0;">Perfil Profissional do Personal</h3>
+            <p style="font-size: 11px; color: var(--text-grey); margin: 2px 0 0 0;">Configure seus dados de atendimento e gestão de alunos</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-body" style="padding: 16px 2px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;">
+        <div class="form-group">
+          <label class="form-label" style="font-weight: 800; color: white;">Nome Profissional / Como quer ser chamado <span style="color: #ff5252;">*</span></label>
+          <input type="text" id="onboardingTrainerName" class="form-input" placeholder="Ex: Prof. Carlos Eduardo Silva">
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="form-group">
+            <label class="form-label">Cidade</label>
+            <input type="text" id="onboardingTrainerCity" class="form-input" placeholder="Ex: São Paulo">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Estado (UF)</label>
+            <input type="text" id="onboardingTrainerState" class="form-input" placeholder="Ex: SP" maxlength="2" style="text-transform: uppercase;">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Telefone / WhatsApp Profissional (Opcional)</label>
+          <input type="tel" id="onboardingTrainerPhone" class="form-input" placeholder="(11) 99999-9999">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Biografia Curta / Apresentação (Opcional)</label>
+          <textarea id="onboardingTrainerBio" class="form-input" rows="2" placeholder="Especialista em hipertrofia e treinamento funcional personalizado..."></textarea>
+        </div>
+
+        <!-- CREF e Aviso de Homologação -->
+        <div style="background: rgba(255,215,0,0.06); border: 1px dashed rgba(255,215,0,0.4); border-radius: 12px; padding: 12px;">
+          <label class="form-label" style="font-weight: 800; color: #ffd700; margin-bottom: 6px;">Registro Profissional (CREF)</label>
+          <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 8px; margin-bottom: 8px;">
+            <input type="text" id="onboardingTrainerCREF" class="form-input" placeholder="Nº CREF (Ex: 123456-G)">
+            <input type="text" id="onboardingTrainerCREFState" class="form-input" placeholder="UF" maxlength="2" style="text-transform: uppercase;">
+          </div>
+          <p style="font-size: 10.5px; color: #b0c4de; margin: 0; line-height: 1.35;">
+            🔒 <em>Atenção: O selo oficial <strong>"Personal Verificado"</strong> é liberado exclusivamente após validação administrativa do seu registro pelo suporte TitanNova Fit.</em>
+          </p>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" style="font-weight: 700; color: white;">Especialidades de Atendimento</label>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+            <label class="chip-item" style="font-size: 11px; background: rgba(255,255,255,0.06); padding: 5px 10px; border-radius: 8px; cursor: pointer; color: white;">
+              <input type="checkbox" name="onboardingTrainerSpec" value="Hipertrofia" checked> Hipertrofia
+            </label>
+            <label class="chip-item" style="font-size: 11px; background: rgba(255,255,255,0.06); padding: 5px 10px; border-radius: 8px; cursor: pointer; color: white;">
+              <input type="checkbox" name="onboardingTrainerSpec" value="Emagrecimento" checked> Emagrecimento
+            </label>
+            <label class="chip-item" style="font-size: 11px; background: rgba(255,255,255,0.06); padding: 5px 10px; border-radius: 8px; cursor: pointer; color: white;">
+              <input type="checkbox" name="onboardingTrainerSpec" value="Força"> Força / Powerlifting
+            </label>
+            <label class="chip-item" style="font-size: 11px; background: rgba(255,255,255,0.06); padding: 5px 10px; border-radius: 8px; cursor: pointer; color: white;">
+              <input type="checkbox" name="onboardingTrainerSpec" value="Funcional"> Treinamento Funcional
+            </label>
+            <label class="chip-item" style="font-size: 11px; background: rgba(255,255,255,0.06); padding: 5px 10px; border-radius: 8px; cursor: pointer; color: white;">
+              <input type="checkbox" name="onboardingTrainerSpec" value="Reabilitação"> Reabilitação / Postura
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="padding-top: 12px; border-top: 1px solid var(--divider);">
+        <button type="button" onclick="submitTrainerOnboarding()" class="btn btn-primary" style="width: 100%; font-weight: 900; padding: 12px; font-size: 13px; background: #ffd700; color: #0a0e17; border-color: #ffd700;">
+          ✅ CONCLUIR E ACESSAR PAINEL DO PERSONAL
         </button>
       </div>
     </div>
@@ -8392,7 +8661,11 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
                 <p style="font-size: 11px; color: var(--text-grey); margin: 0;">${daysStr}</p>
                 ${w.descricao ? `<span style="display: inline-block; background: rgba(0,210,255,0.12); color: var(--accent-cyan); font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; margin-top: 6px;">${w.descricao}</span>` : ''}
               </div>
-              <button onclick="deleteWorkoutCard('${w.id}')" style="background: none; border: none; color: var(--error-red); cursor: pointer; font-size: 16px; padding: 4px;" title="Excluir treino">🗑️</button>
+              <div style="display: flex; gap: 4px; align-items: center;">
+                <button onclick="duplicateWorkout('${w.id}')" style="background: none; border: none; color: var(--accent-cyan); cursor: pointer; font-size: 15px; padding: 4px;" title="Duplicar treino (Clonar)">📑</button>
+                <button onclick="shareWorkoutWhatsApp('${w.id}')" style="background: none; border: none; color: #25D366; cursor: pointer; font-size: 15px; padding: 4px;" title="Compartilhar via WhatsApp">💬</button>
+                <button onclick="deleteWorkoutCard('${w.id}')" style="background: none; border: none; color: var(--error-red); cursor: pointer; font-size: 15px; padding: 4px;" title="Excluir treino">🗑️</button>
+              </div>
             </div>
 
             <!-- Botão para Expandir / Recolher Exercícios Montados -->
@@ -8725,17 +8998,26 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
                 <input type="number" class="form-input set-reps-input" value="${defaultReps}" oninput="saveActiveSessionToStorage()" onchange="saveActiveSessionToStorage()" style="padding: 6px 4px; font-size: 12px; text-align: center;" placeholder="10">
                 <button type="button" class="btn-micro" onclick="quickAdjustReps('${rowId}', 1)" style="padding: 3px 5px; font-size: 9.5px;" title="Adicionar 1 rep">+1</button>
               </div>
+              <div style="width: 40px; display: flex; align-items: center;">
+                <input type="number" min="1" max="10" step="0.5" class="form-input set-rpe-input" value="" oninput="saveActiveSessionToStorage()" onchange="saveActiveSessionToStorage()" style="padding: 6px 2px; font-size: 11px; text-align: center;" placeholder="RPE" title="Esforço Percebido 1-10">
+              </div>
               <div class="set-check" onclick="toggleSetDone('${rowId}', ${restDuration})">✓</div>
             </div>
           `;
         }
 
+        const exMuscle = ex.grupoMuscular || ex.grupo_muscular || (typeof getExerciseMuscleGroup === 'function' ? getExerciseMuscleGroup(ex.nome) : 'Geral');
+
         return `
-          <div class="card active-exercise-card" data-ex-index="${exIdx}" data-ex-name="${safeName}" data-ex-id="${ex.id || 'ex_' + exIdx}" style="border-left: 4px solid var(--accent-cyan); padding: 14px; margin-bottom: 12px;">
+          <div class="card active-exercise-card" data-ex-index="${exIdx}" data-ex-name="${safeName}" data-ex-id="${ex.id || 'ex_' + exIdx}" data-ex-muscle="${exMuscle}" style="border-left: 4px solid var(--accent-cyan); padding: 14px; margin-bottom: 12px;">
             <div style="margin-bottom: 10px;">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px;">
                 <span style="font-size: 10px; color: var(--primary-blue); font-weight: 800; letter-spacing: 0.5px;">EXERCÍCIO ${exIdx + 1} DE ${exercises.length}</span>
-                <span style="font-size: 10px; color: var(--text-grey); font-weight: 700;">⏱ Descanso: ${restDuration}s</span>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <button type="button" onclick="openReplaceActiveExerciseModal(${exIdx})" class="btn-micro" style="padding: 2px 7px; font-size: 10px; color: var(--accent-cyan); border-color: rgba(0,210,255,0.4);" title="Substituir por outro exercício">🔄 Substituir</button>
+                  <button type="button" onclick="skipActiveExercise(${exIdx})" class="btn-micro" style="padding: 2px 7px; font-size: 10px; color: var(--text-grey);" title="Pular este exercício hoje">⏭️ Pular</button>
+                  <span style="font-size: 10px; color: var(--text-grey); font-weight: 700;">⏱ ${restDuration}s</span>
+                </div>
               </div>
               <h3 style="font-size: 16px; font-weight: 800; margin-top: 2px; color: white;">${ex.nome}</h3>
               <p style="font-size: 11px; color: var(--text-grey); margin: 0;">${ex.series || 4} séries x ${ex.reps || '10-12'} reps • ${ex.equipamento || 'Livre'}</p>
@@ -8758,9 +9040,10 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
             <!-- Cabeçalho das Colunas de Séries -->
             <div style="font-size: 10.5px; font-weight: 800; color: var(--text-grey); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; padding: 0 2px;">
               <span style="width: 24px; text-align: center;">SET</span>
-              <span style="width: 72px; text-align: center; color: var(--accent-cyan);">ÚLTIMA</span>
+              <span style="width: 68px; text-align: center; color: var(--accent-cyan);">ÚLTIMA</span>
               <span style="flex: 1; text-align: center;">CARGA (KG)</span>
               <span style="flex: 1; text-align: center;">REPETIÇÕES</span>
+              <span style="width: 40px; text-align: center;" title="Percepção Subjetiva de Esforço (1-10)">RPE</span>
               <span style="width: 32px; text-align: center;">OK</span>
             </div>
 
@@ -8810,6 +9093,9 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
             <input type="number" class="form-input set-reps-input" value="${defaultReps}" oninput="saveActiveSessionToStorage()" onchange="saveActiveSessionToStorage()" style="padding: 6px 4px; font-size: 12px; text-align: center;" placeholder="10">
             <button type="button" class="btn-micro" onclick="quickAdjustReps('${rowId}', 1)" style="padding: 3px 5px; font-size: 9.5px;">+1</button>
           </div>
+          <div style="width: 40px; display: flex; align-items: center;">
+            <input type="number" min="1" max="10" step="0.5" class="form-input set-rpe-input" value="" oninput="saveActiveSessionToStorage()" onchange="saveActiveSessionToStorage()" style="padding: 6px 2px; font-size: 11px; text-align: center;" placeholder="RPE" title="Esforço Percebido 1-10">
+          </div>
           <div class="set-check" onclick="toggleSetDone('${rowId}', 60)">✓</div>
         </div>
       `;
@@ -8837,21 +9123,28 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       if (!row) return;
       const badge = row.querySelector('.set-type-badge');
       const currentType = row.getAttribute('data-set-type') || 'normal';
-      const types = ['normal', 'aquecimento', 'preparacao', 'drop', 'cronometrada'];
+      const types = ['normal', 'aquecimento', 'preparacao', 'drop', 'falha', 'superserie', 'cronometrada'];
       const labels = {
-        'normal': badge.innerText.replace(/[^0-9]/g, '') || '1',
-        'aquecimento': 'A',
+        'normal': badge.getAttribute('data-original-num') || badge.innerText.replace(/[^0-9]/g, '') || '1',
+        'aquecimento': 'W',
         'preparacao': 'P',
         'drop': 'D',
+        'falha': 'F',
+        'superserie': 'SS',
         'cronometrada': 'C'
       };
       const colors = {
-        'normal': 'transparent',
-        'aquecimento': 'rgba(255, 179, 0, 0.3)',
-        'preparacao': 'rgba(0, 210, 255, 0.3)',
-        'drop': 'rgba(239, 83, 80, 0.3)',
-        'cronometrada': 'rgba(156, 39, 176, 0.3)'
+        'normal': 'rgba(255,255,255,0.07)',
+        'aquecimento': 'rgba(255, 179, 0, 0.35)',
+        'preparacao': 'rgba(0, 210, 255, 0.35)',
+        'drop': 'rgba(239, 83, 80, 0.35)',
+        'falha': 'rgba(220, 20, 60, 0.45)',
+        'superserie': 'rgba(0, 230, 118, 0.35)',
+        'cronometrada': 'rgba(156, 39, 176, 0.35)'
       };
+      if (!badge.getAttribute('data-original-num')) {
+        badge.setAttribute('data-original-num', badge.innerText.replace(/[^0-9]/g, '') || '1');
+      }
       const nextIdx = (types.indexOf(currentType) + 1) % types.length;
       const nextType = types[nextIdx];
       row.setAttribute('data-set-type', nextType);
@@ -8900,12 +9193,14 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
         const setType = row.getAttribute('data-set-type') || 'normal';
         const weightInput = row.querySelector('.set-weight-input');
         const repsInput = row.querySelector('.set-reps-input');
+        const rpeInput = row.querySelector('.set-rpe-input');
         setsState.push({
           id: row.id,
           done: isDone,
           type: setType,
           weight: weightInput ? weightInput.value : '',
-          reps: repsInput ? repsInput.value : ''
+          reps: repsInput ? repsInput.value : '',
+          rpe: rpeInput ? rpeInput.value : ''
         });
       });
 
@@ -8958,8 +9253,10 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
               }
               const weightInput = row.querySelector('.set-weight-input');
               const repsInput = row.querySelector('.set-reps-input');
+              const rpeInput = row.querySelector('.set-rpe-input');
               if (weightInput && st.weight) weightInput.value = st.weight;
               if (repsInput && st.reps) repsInput.value = st.reps;
+              if (rpeInput && st.rpe) rpeInput.value = st.rpe;
             }
           });
         }
@@ -9058,6 +9355,10 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       exerciseCards.forEach((card, exIdx) => {
         const exName = card.getAttribute('data-ex-name') || 'Exercício';
         const exId = card.getAttribute('data-ex-id') || ('ex_' + exIdx);
+        let exMuscle = card.getAttribute('data-ex-muscle') || '';
+        if (!exMuscle || exMuscle === 'Geral') {
+          exMuscle = typeof getExerciseMuscleGroup === 'function' ? getExerciseMuscleGroup(exName) : 'Geral';
+        }
         const cardSets = [];
 
         const rows = card.querySelectorAll('.set-row');
@@ -9125,6 +9426,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
           exerciciosDetalhados.push({
             id: exId,
             nome: exName,
+            grupoMuscular: exMuscle,
             series: cardSets
           });
         }
@@ -9283,6 +9585,75 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
           try { navigator.vibrate(60); } catch (_) {}
         }
         startRestTimer(restDuration || 60);
+
+        // Auto-focus no próximo set pendente (Strong-like UX)
+        try {
+          const allRows = Array.from(document.querySelectorAll('#activeWorkoutExercisesContainer .set-row'));
+          const curIndex = allRows.indexOf(row);
+          if (curIndex >= 0 && curIndex < allRows.length - 1) {
+            for (let next = curIndex + 1; next < allRows.length; next++) {
+              if (!allRows[next].classList.contains('done')) {
+                const nextInput = allRows[next].querySelector('.set-reps-input') || allRows[next].querySelector('.set-weight-input');
+                if (nextInput) {
+                  setTimeout(() => {
+                    nextInput.focus();
+                    if (nextInput.select) nextInput.select();
+                  }, 120);
+                }
+                break;
+              }
+            }
+          }
+        } catch (_) {}
+      }
+    }
+
+    let isRestTimerPaused = false;
+
+    function togglePauseRestTimer() {
+      const pauseBtn = document.getElementById('restTimerPauseBtn');
+      if (isRestTimerPaused) {
+        // Retomar
+        isRestTimerPaused = false;
+        restTimerTargetTimestamp = Date.now() + restTimeRemaining * 1000;
+        if (pauseBtn) {
+          pauseBtn.innerText = '⏸️ Pausar';
+          pauseBtn.style.color = '#ffd700';
+        }
+        clearInterval(restTimerInterval);
+        restTimerInterval = setInterval(() => {
+          if (isRestTimerPaused) return;
+          const remaining = Math.max(0, Math.ceil((restTimerTargetTimestamp - Date.now()) / 1000));
+          restTimeRemaining = remaining;
+          updateRestUI();
+
+          if (remaining <= 0) {
+            clearInterval(restTimerInterval);
+            playAudioBeep();
+            if ('vibrate' in navigator) {
+              try { navigator.vibrate([200, 100, 200, 100, 300]); } catch (_) {}
+            }
+            if ('Notification' in window && Notification.permission === 'granted') {
+              try {
+                new Notification('TitanNova Fit — Descanso Concluído!', {
+                  body: 'Hora da próxima série! Mantenha a intensidade.',
+                  icon: 'assets/icons/icon-192.png'
+                });
+              } catch (_) {}
+            }
+            showToastNotification('🔔 Tempo de Descanso Concluído! Inicie sua próxima série.');
+            const restBar = document.getElementById('restTimerBar');
+            if (restBar) restBar.classList.remove('active');
+          }
+        }, 500);
+      } else {
+        // Pausar
+        isRestTimerPaused = true;
+        clearInterval(restTimerInterval);
+        if (pauseBtn) {
+          pauseBtn.innerText = '▶️ Retomar';
+          pauseBtn.style.color = 'var(--accent-cyan)';
+        }
       }
     }
 
@@ -10636,6 +11007,123 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
     }
 
     // ==========================================
+    // NORMALIZAÇÃO MUSCULAR E DEDUPLICAÇÃO INTELIGENTE
+    // ==========================================
+    function normalizeMuscleName(muscle, exerciseName = '') {
+      let raw = (muscle || '').toString().trim().toLowerCase();
+
+      if (!raw || raw === 'geral' || raw === 'outros') {
+        raw = inferMuscleFromName(exerciseName);
+      }
+
+      if (/peito|peitoral|chest|pectoral/.test(raw)) return 'Peito';
+      if (/costas|dorsal|back|lats|pull-up|pulldown/.test(raw)) return 'Costas';
+      if (/tr[íi]ceps|triceps/.test(raw)) return 'Tríceps';
+      if (/b[íi]ceps|biceps|braquial/.test(raw)) return 'Bíceps';
+      if (/ombro|ombros|deltoid|deltoide|shoulder/.test(raw)) return 'Ombros';
+      if (/perna|pernas|quadr[íi]ceps|quadriceps|femural|coxa|coxas|gl[úu]teo|gluteo|leg|legs|hamstring|isquiotibial/.test(raw)) return 'Pernas';
+      if (/panturrilha|panturrilhas|calf|calves|g[êe]meos/.test(raw)) return 'Panturrilhas';
+      if (/abd[ôo]men|abdomen|abdominal|core|waist|abs/.test(raw)) return 'Abdômen';
+      if (/trap[ée]zio|trapezio|traps/.test(raw)) return 'Trapézio';
+
+      return 'Outros';
+    }
+
+    function inferMuscleFromName(name) {
+      if (!name) return 'Outros';
+      const n = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+      if (/supino|crucifixo|peck deck|voador|flexao de braco|crossover/.test(n)) return 'peito';
+      if (/remada|puxada|serrote|barra fixa|pulldown|dorsal/.test(n)) return 'costas';
+      if (/triceps|frances|testa|corda|coice|mergulho no banco/.test(n)) return 'tríceps';
+      if (/biceps|rosca|scott|martelo/.test(n)) return 'bíceps';
+      if (/desenvolvimento|elevacao lateral|elevacao frontal|crucifixo inverso|deltoide|manguito/.test(n)) return 'ombros';
+      if (/agachamento|leg press|extensora|flexora|stiff|afundo|bulgaro|passada|hack|pelvica|hip thrust/.test(n)) return 'pernas';
+      if (/panturrilha|gemeos/.test(n)) return 'panturrilhas';
+      if (/abdominal|prancha|crunch|infra|supra|obliquo/.test(n)) return 'abdômen';
+      if (/encolhimento|trapezio/.test(n)) return 'trapézio';
+
+      return 'Outros';
+    }
+
+    function getExerciseMuscleGroup(exerciseName) {
+      if (!exerciseName) return 'Outros';
+      const clean = exerciseName.toLowerCase().trim();
+
+      // 1. Procurar em DEFAULT_BASE_EXERCISES
+      if (typeof DEFAULT_BASE_EXERCISES !== 'undefined' && Array.isArray(DEFAULT_BASE_EXERCISES)) {
+        const found = DEFAULT_BASE_EXERCISES.find(e => (e.nome || e.name || '').toLowerCase().trim() === clean);
+        if (found && (found.grupoMuscular || found.grupo_muscular)) {
+          return normalizeMuscleName(found.grupoMuscular || found.grupo_muscular, exerciseName);
+        }
+      }
+
+      // 2. Procurar em DEFAULT_TRAINING_TEMPLATES
+      if (typeof DEFAULT_TRAINING_TEMPLATES !== 'undefined') {
+        for (const key of Object.keys(DEFAULT_TRAINING_TEMPLATES)) {
+          const list = DEFAULT_TRAINING_TEMPLATES[key];
+          if (Array.isArray(list)) {
+            const found = list.find(t => (t.nome || '').toLowerCase().trim() === clean);
+            if (found && found.grupoMuscular) {
+              return normalizeMuscleName(found.grupoMuscular, exerciseName);
+            }
+          }
+        }
+      }
+
+      // 3. Procurar em exercisesList
+      if (typeof exercisesList !== 'undefined' && Array.isArray(exercisesList)) {
+        const found = exercisesList.find(e => (e.nome || e.name || '').toLowerCase().trim() === clean);
+        if (found && (found.grupoMuscular || found.grupo_muscular)) {
+          return normalizeMuscleName(found.grupoMuscular || found.grupo_muscular, exerciseName);
+        }
+      }
+
+      // 4. Inferir por palavras-chave
+      return normalizeMuscleName(inferMuscleFromName(exerciseName), exerciseName);
+    }
+
+    function isBodyweightExercise(exerciseName) {
+      if (!exerciseName) return false;
+      const n = exerciseName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      return /flexao|barra fixa|chin-up|pull-up|paralela|mergulho no banco|dips|prancha|abdominal|crunch|peso corporal|livre sem peso/.test(n);
+    }
+
+    function openExerciseInEvolutionChart(exerciseName) {
+      if (!exerciseName) return;
+      switchHistorySubTab('charts');
+      const select = document.getElementById('chartExerciseSelect');
+      if (select) {
+        let optionFound = false;
+        for (let i = 0; i < select.options.length; i++) {
+          if (select.options[i].value.toLowerCase().trim() === exerciseName.toLowerCase().trim()) {
+            select.selectedIndex = i;
+            optionFound = true;
+            break;
+          }
+        }
+        if (!optionFound) {
+          const opt = document.createElement('option');
+          opt.value = exerciseName;
+          opt.innerText = exerciseName;
+          select.prepend(opt);
+          select.selectedIndex = 0;
+        }
+        renderEvolutionChart();
+        showToastNotification(`📈 Exibindo evolução de ${exerciseName}`);
+      }
+    }
+
+    function filterPersonalRecords(query) {
+      const q = (query || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+      const items = document.querySelectorAll('#personalRecordsContainer .pr-card-item');
+      items.forEach(el => {
+        const name = (el.getAttribute('data-ex-name') || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        el.style.display = !q || name.includes(q) ? 'flex' : 'none';
+      });
+    }
+
+    // ==========================================
     // RECORDES PESSOAIS (PRS) E DISTRIBUIÇÃO MUSCULAR
     // ==========================================
     function renderPersonalRecordsAndMuscles() {
@@ -10650,68 +11138,108 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       historyList.forEach(sess => {
         if (Array.isArray(sess.exercicios_detalhados)) {
           sess.exercicios_detalhados.forEach(ex => {
-            const name = ex.nome;
+            const name = ex.nome || 'Exercício';
+            const isBw = isBodyweightExercise(name);
+
             if (Array.isArray(ex.series)) {
               ex.series.forEach(s => {
                 const w = parseFloat(s.peso || s.peso_kg || 0) || 0;
                 const r = parseInt(s.reps || s.repeticoes || 0) || 0;
+
+                // Não registrar 0 kg como PR se não for exercício de peso corporal
+                if (w <= 0 && !isBw) return;
+                if (w <= 0 && r <= 0) return;
+
                 const prev = prMap.get(name);
                 if (!prev || w > prev.weight || (w === prev.weight && r > prev.reps)) {
+                  // Fórmula de Epley: 1RM = w * (1 + r / 30)
+                  const est1RM = w > 0 ? Math.round(w * (1 + (r > 0 ? r : 10) / 30)) : null;
                   prMap.set(name, {
                     weight: w,
                     reps: r,
+                    est1RM: est1RM,
+                    isBodyweight: isBw && w === 0,
                     date: (sess.data || '').split(/[ ,]+/)[0] || 'Hoje'
                   });
                 }
               });
             }
 
-            // Músculo
-            const matched = (typeof exercisesList !== 'undefined' ? exercisesList.find(x => (x.nome || '').toLowerCase() === (name || '').toLowerCase()) : null) ||
-                            (typeof DEFAULT_BASE_EXERCISES !== 'undefined' ? DEFAULT_BASE_EXERCISES.find(x => (x.nome || x.name || '').toLowerCase() === (name || '').toLowerCase()) : null) || {};
-            const muscle = matched.grupoMuscular || matched.grupo_muscular || 'Geral';
-            muscleCounts[muscle] = (muscleCounts[muscle] || 0) + (ex.series ? ex.series.length : 1);
+            // Normalização e contagem muscular unificada
+            let muscle = ex.grupoMuscular || ex.grupo_muscular || '';
+            if (!muscle || muscle === 'Geral') {
+              muscle = getExerciseMuscleGroup(name);
+            }
+            const normalized = normalizeMuscleName(muscle, name);
+            muscleCounts[normalized] = (muscleCounts[normalized] || 0) + (ex.series ? ex.series.length : 1);
           });
         }
       });
 
-      // Renderizar PRs
+      // Renderizar PRs com 1RM e clique para ver evolução
       if (prContainer) {
         if (prMap.size === 0) {
-          prContainer.innerHTML = `<div style="font-size: 12px; color: var(--text-grey); text-align: center; padding: 14px;">Nenhum recorde registrado ainda. Complete treinos para ver suas melhores marcas!</div>`;
+          prContainer.innerHTML = `<div style="font-size: 12px; color: var(--text-grey); text-align: center; padding: 18px;">Nenhum recorde registrado ainda. Complete treinos com cargas reais para ver suas melhores marcas!</div>`;
         } else {
           const sortedPRs = Array.from(prMap.entries()).sort((a, b) => b[1].weight - a[1].weight);
-          prContainer.innerHTML = sortedPRs.map(([name, data]) => `
-            <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.03); border: 1px solid var(--divider); border-radius: 10px; padding: 10px 14px;">
-              <div>
-                <div style="font-size: 13.5px; font-weight: 800; color: white;">${name}</div>
-                <div style="font-size: 11px; color: var(--text-grey);">📅 ${data.date} • ${data.reps} reps</div>
+          prContainer.innerHTML = sortedPRs.map(([name, data]) => {
+            const safeName = name.replace(/'/g, "\\'");
+            const est1RMBadge = data.est1RM ? `<span style="font-size: 10.5px; background: rgba(0,210,255,0.12); color: var(--accent-cyan); padding: 2px 7px; border-radius: 6px; font-weight: 800; border: 1px solid rgba(0,210,255,0.25);">1RM est. ~${data.est1RM} kg</span>` : '';
+            return `
+              <div class="pr-card-item" data-ex-name="${name}" onclick="openExerciseInEvolutionChart('${safeName}')" style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.03); border: 1px solid var(--divider); border-radius: 12px; padding: 12px 14px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='var(--accent-cyan)'" onmouseout="this.style.borderColor='var(--divider)'">
+                <div>
+                  <div style="font-size: 13.5px; font-weight: 800; color: white; display: flex; align-items: center; gap: 6px;">
+                    <span>${name}</span>
+                    <span style="font-size: 11px; color: var(--accent-cyan);" title="Ver gráfico">📈</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                    <span style="font-size: 11px; color: var(--text-grey);">📅 ${data.date} • ${data.reps} reps</span>
+                    ${est1RMBadge}
+                  </div>
+                </div>
+                <div style="text-align: right;">
+                  <div style="font-size: 16px; font-weight: 900; color: #ffb300; background: rgba(255,179,0,0.12); padding: 4px 10px; border-radius: 8px; border: 1px solid rgba(255,179,0,0.3); display: inline-block;">
+                    ${data.weight > 0 ? `${data.weight} kg` : `${data.reps} reps`}
+                  </div>
+                  ${data.isBodyweight ? '<div style="font-size: 9.5px; color: var(--text-grey); margin-top: 2px;">peso corporal</div>' : ''}
+                </div>
               </div>
-              <div style="font-size: 16px; font-weight: 900; color: #ffb300; background: rgba(255,179,0,0.12); padding: 4px 10px; border-radius: 8px; border: 1px solid rgba(255,179,0,0.3);">
-                ${data.weight > 0 ? `${data.weight} kg` : `${data.reps} reps`}
-              </div>
-            </div>
-          `).join('');
+            `;
+          }).join('');
         }
       }
 
-      // Renderizar Distribuição Muscular
+      // Renderizar Distribuição Muscular com Ícones e Cores
       if (muscleContainer) {
         const totalSets = Object.values(muscleCounts).reduce((a, b) => a + b, 0);
         if (totalSets === 0) {
-          muscleContainer.innerHTML = `<div style="font-size: 12px; color: var(--text-grey); text-align: center; padding: 14px;">Complete treinos para visualizar seu equilíbrio muscular.</div>`;
+          muscleContainer.innerHTML = `<div style="font-size: 12px; color: var(--text-grey); text-align: center; padding: 18px;">Complete treinos para visualizar seu equilíbrio muscular.</div>`;
         } else {
+          const MUSCLE_THEME = {
+            'Peito': { icon: '🛡️', gradient: 'linear-gradient(90deg, #1E88E5, #00D2FF)' },
+            'Costas': { icon: '🦅', gradient: 'linear-gradient(90deg, #00897B, #00E676)' },
+            'Pernas': { icon: '🦵', gradient: 'linear-gradient(90deg, #7B1FA2, #E040FB)' },
+            'Ombros': { icon: '🏹', gradient: 'linear-gradient(90deg, #E65100, #FFB300)' },
+            'Bíceps': { icon: '💪', gradient: 'linear-gradient(90deg, #2E7D32, #76FF03)' },
+            'Tríceps': { icon: '⚡', gradient: 'linear-gradient(90deg, #C2185B, #FF5252)' },
+            'Abdômen': { icon: '🧱', gradient: 'linear-gradient(90deg, #3F51B5, #448AFF)' },
+            'Panturrilhas': { icon: '🦿', gradient: 'linear-gradient(90deg, #D84315, #FF7043)' },
+            'Trapézio': { icon: '🏔️', gradient: 'linear-gradient(90deg, #512DA8, #7C4DFF)' },
+            'Outros': { icon: '🎯', gradient: 'linear-gradient(90deg, #546E7A, #90A4AE)' }
+          };
+
           const sortedMuscles = Object.entries(muscleCounts).sort((a, b) => b[1] - a[1]);
           muscleContainer.innerHTML = sortedMuscles.map(([muscle, count]) => {
             const pct = Math.round((count / totalSets) * 100);
+            const theme = MUSCLE_THEME[muscle] || MUSCLE_THEME['Outros'];
             return `
-              <div>
+              <div style="margin-bottom: 2px;">
                 <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; color: white; margin-bottom: 4px;">
-                  <span>${muscle.toUpperCase()}</span>
+                  <span>${theme.icon} ${muscle.toUpperCase()}</span>
                   <span style="color: var(--accent-cyan);">${count} séries (${pct}%)</span>
                 </div>
-                <div style="height: 6px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden;">
-                  <div style="height: 100%; width: ${pct}%; background: linear-gradient(90deg, var(--primary-blue), var(--accent-cyan)); border-radius: 4px;"></div>
+                <div style="height: 7px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden;">
+                  <div style="height: 100%; width: ${pct}%; background: ${theme.gradient}; border-radius: 4px; transition: width 0.4s ease;"></div>
                 </div>
               </div>
             `;
@@ -10965,6 +11493,10 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
 
       // 4. Atualizar Hero Card com Treino Recomendado Hoje
       updateRecommendedWorkoutHero(lastWorkout);
+
+      // 5. Atualizar Streak (Ofensiva) e Treinos Prescritos
+      if (typeof updateHomeStreakUI === 'function') updateHomeStreakUI();
+      if (typeof updateHomeAssignedWorkoutsUI === 'function') updateHomeAssignedWorkoutsUI();
     }
 
     function updateRecommendedWorkoutHero(lastWorkout) {
@@ -12777,6 +13309,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       // 7. Atualizar todos os conteúdos da página imediatamente
       updateRoleUI();
       updateHomeScreenUI();
+      if (typeof checkUserOnboarding === 'function') checkUserOnboarding();
       renderAllWorkoutsUI();
       updateProfileUI();
       if (typeof updateFavoriteButtons === 'function') updateFavoriteButtons();
@@ -13542,14 +14075,24 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
     function shareInviteWhatsApp() {
       const invite = TrainerModule.latestGeneratedInvite;
       if (!invite || !invite.url) {
-        alert('Gere o link de convite primeiro.');
+        showToastNotification('Gere o link de convite primeiro.');
         return;
       }
 
-      const trainerName = currentTrainerProfile?.professional_name || currentAuthUser?.user_metadata?.nome || 'Seu Personal Trainer';
-      const msg = `Olá! Sou o ${trainerName} e preparei seu acompanhamento de treinos no TitanNova Fit.\n\nClique no link abaixo para conectar sua conta e acessar suas fichas:\n${invite.url}`;
+      const msg = `Olá! Preparei um treino para você no TitanNova Fit. Acesse este link para entrar na sua conta e visualizar a ficha: ${invite.url}`;
       const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
       window.open(waUrl, '_blank');
+      showToastNotification('WhatsApp aberto para compartilhamento.');
+    }
+
+    function shareWorkoutWhatsApp(workoutId) {
+      const w = allWorkoutsList.find(item => item.id === workoutId);
+      if (!w) return;
+      const appUrl = `${window.location.origin}${window.location.pathname}`;
+      const msg = `Olá! Preparei um treino para você no TitanNova Fit. Acesse este link para entrar na sua conta e visualizar a ficha: ${appUrl}`;
+      const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+      window.open(waUrl, '_blank');
+      showToastNotification('WhatsApp aberto para compartilhamento.');
     }
 
     function shareInviteNative() {
@@ -14070,6 +14613,558 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
     // ==============================================================================
     // HOMOLOGAÇÃO DE CREF / PERSONAIS PELO ADMINISTRADOR
     // ==============================================================================
+    // Global binding para botão no HTML
+    function loadAdminTrainersList() {
+      if (typeof AdminTrainersModule !== 'undefined' && typeof AdminTrainersModule.loadAdminTrainersList === 'function') {
+        AdminTrainersModule.loadAdminTrainersList();
+      }
+    }
+
+    // ==========================================
+    // CLONAGEM / DUPLICAÇÃO DE TREINOS
+    // ==========================================
+    async function duplicateWorkout(workoutId) {
+      const check = FeatureGate.canCreateWorkout(1);
+      if (!check.allowed) {
+        if (typeof openSubscriptionModal === 'function') {
+          openSubscriptionModal(check.message);
+        } else {
+          alert(check.message);
+        }
+        return;
+      }
+
+      const target = allWorkoutsList.find(w => w.id === workoutId);
+      if (!target) {
+        showToastNotification('Treino não encontrado para duplicação.');
+        return;
+      }
+
+      const newId = 'treino_' + Date.now();
+      const cloned = {
+        ...JSON.parse(JSON.stringify(target)),
+        id: newId,
+        nome: `${target.nome} (Cópia)`,
+        created_at: new Date().toISOString()
+      };
+
+      allWorkoutsList.unshift(cloned);
+      const uid = getEffectiveUserId();
+      if (uid) {
+        localStorage.setItem(`titannovafit_workouts_${uid}`, JSON.stringify(allWorkoutsList));
+      }
+      localStorage.setItem('titannovafit_custom_workouts', JSON.stringify(allWorkoutsList));
+      renderAllWorkoutsUI();
+      showToastNotification(`Treino "${target.nome}" duplicado com sucesso!`);
+
+      if (_supabase && uid && uid !== 'offline_user_local') {
+        try {
+          await TitanNovaOfflineSync.enqueueOperation({
+            userId: uid,
+            table: 'treinos',
+            action: 'insert',
+            clientId: newId,
+            payload: cloned
+          });
+          TitanNovaOfflineSync.flushQueue(uid);
+        } catch (_) {}
+      }
+    }
+
+    // ==========================================
+    // FILTROS DE ALUNOS DO PERSONAL
+    // ==========================================
+    let currentStudentFilterType = 'all';
+
+    function setTrainerStudentFilter(filterType, btnEl) {
+      currentStudentFilterType = filterType;
+      document.querySelectorAll('#trainerFilterChipsContainer .chip-filter').forEach(c => {
+        c.classList.remove('active');
+        c.style.background = 'transparent';
+        c.style.color = 'var(--text-grey)';
+        c.style.borderColor = 'var(--divider)';
+      });
+      if (btnEl) {
+        btnEl.classList.add('active');
+        btnEl.style.background = 'rgba(0,210,255,0.15)';
+        btnEl.style.color = 'var(--accent-cyan)';
+        btnEl.style.borderColor = 'var(--accent-cyan)';
+      }
+      if (typeof TrainerModule !== 'undefined') {
+        TrainerModule.renderStudentsUI();
+      }
+    }
+
+    // ==========================================
+    // SUBSTITUIÇÃO DE EXERCÍCIO NO TREINO ATIVO
+    // ==========================================
+    let replacingActiveExerciseIndex = null;
+    let replacingActiveExerciseMuscle = '';
+
+    function openReplaceActiveExerciseModal(exIdx) {
+      replacingActiveExerciseIndex = exIdx;
+      const card = document.querySelector(`.active-exercise-card[data-ex-index="${exIdx}"]`);
+      const currentName = card ? (card.getAttribute('data-ex-name') || 'Exercício') : 'Exercício';
+      replacingActiveExerciseMuscle = card ? (card.getAttribute('data-ex-muscle') || 'Geral') : 'Geral';
+
+      const modal = document.getElementById('modalReplaceActiveExercise');
+      const subtitle = document.getElementById('replaceActiveExerciseSubtitle');
+      const searchInput = document.getElementById('replaceActiveExerciseSearch');
+
+      if (subtitle) subtitle.innerText = `Substituir "${currentName}" por um exercício equivalente`;
+      if (searchInput) searchInput.value = '';
+
+      renderReplaceActiveExerciseSuggestions();
+      if (modal) modal.style.display = 'flex';
+    }
+
+    function closeReplaceActiveExerciseModal() {
+      const modal = document.getElementById('modalReplaceActiveExercise');
+      if (modal) modal.style.display = 'none';
+      replacingActiveExerciseIndex = null;
+    }
+
+    function filterReplaceActiveExerciseList() {
+      renderReplaceActiveExerciseSuggestions();
+    }
+
+    function renderReplaceActiveExerciseSuggestions() {
+      const container = document.getElementById('replaceActiveExerciseListContainer');
+      const query = (document.getElementById('replaceActiveExerciseSearch')?.value || '').toLowerCase().trim();
+      if (!container) return;
+
+      const list = (Array.isArray(exercisesList) && exercisesList.length > 0) ? exercisesList : DEFAULT_BASE_EXERCISES;
+      
+      const filtered = list.filter(ex => {
+        const exName = (ex.nome || ex.name || '').toLowerCase();
+        const exGroup = (ex.grupoMuscular || (ex.bodyParts && ex.bodyParts[0]) || '').toLowerCase();
+        const matchesQuery = !query || exName.includes(query) || exGroup.includes(query);
+        const matchesMuscle = !query ? (exGroup.includes(replacingActiveExerciseMuscle.toLowerCase()) || replacingActiveExerciseMuscle === 'Geral') : true;
+        return matchesQuery && (query ? true : matchesMuscle);
+      }).slice(0, 35);
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: var(--text-grey); padding: 24px; font-size: 12px;">Nenhum exercício encontrado. Tente buscar pelo nome do músculo.</div>';
+        return;
+      }
+
+      container.innerHTML = filtered.map(ex => {
+        const name = ex.nome || ex.name || 'Exercício';
+        const safeName = name.replace(/'/g, "\\'");
+        const muscle = ex.grupoMuscular || (ex.bodyParts && ex.bodyParts[0]) || 'Geral';
+        const gif = ex.gifUrl || ex.gif_url || '';
+        return `
+          <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.04); border: 1px solid var(--divider); padding: 10px 12px; border-radius: 10px;">
+            <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+              <div style="width: 36px; height: 36px; border-radius: 6px; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <img src="${gif || 'assets/icons/logo.png'}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='assets/icons/logo.png'">
+              </div>
+              <div style="min-width: 0;">
+                <h5 style="font-size: 13px; font-weight: 700; color: white; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${name}</h5>
+                <span style="font-size: 10.5px; color: var(--accent-cyan); font-weight: 600;">${muscle}</span>
+              </div>
+            </div>
+            <button type="button" onclick="confirmReplaceActiveExercise('${safeName}', '${muscle}', '${gif}')" class="btn btn-primary" style="width: auto; padding: 6px 12px; font-size: 11px; font-weight: 800; white-space: nowrap; margin-left: 8px;">
+              Selecionar
+            </button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function confirmReplaceActiveExercise(newName, newMuscle, newGif) {
+      if (replacingActiveExerciseIndex === null || !currentActiveWorkout) return;
+      if (!Array.isArray(currentActiveWorkout.exercicios)) currentActiveWorkout.exercicios = [];
+
+      const currentEx = currentActiveWorkout.exercicios[replacingActiveExerciseIndex] || {};
+      const updatedEx = {
+        ...currentEx,
+        nome: newName,
+        grupoMuscular: newMuscle,
+        gifUrl: newGif
+      };
+
+      currentActiveWorkout.exercicios[replacingActiveExerciseIndex] = updatedEx;
+      closeReplaceActiveExerciseModal();
+      renderActiveWorkoutExercises(currentActiveWorkout);
+      saveActiveSessionToStorage();
+      showToastNotification(`Exercício substituído por "${newName}".`);
+    }
+
+    function skipActiveExercise(exIdx) {
+      const card = document.querySelector(`.active-exercise-card[data-ex-index="${exIdx}"]`);
+      if (!card) return;
+      const exName = card.getAttribute('data-ex-name') || 'Exercício';
+      if (confirm(`Deseja pular "${exName}" nesta sessão de treino?`)) {
+        card.style.opacity = '0.45';
+        card.style.borderLeftColor = 'var(--text-grey)';
+        card.querySelectorAll('.set-row').forEach(r => r.classList.add('skipped'));
+        saveActiveSessionToStorage();
+        showToastNotification(`"${exName}" pulado.`);
+      }
+    }
+
+    // ==========================================
+    // ALTERNÂNCIA DE PAPÉIS (ATLETA / PERSONAL)
+    // ==========================================
+    function getActiveRoleMode() {
+      const saved = localStorage.getItem('titannovafit_active_mode');
+      if (saved) return saved;
+      return (currentUserProfile?.account_type === 'trainer') ? 'trainer' : 'athlete';
+    }
+
+    function toggleActiveRoleMode() {
+      const current = getActiveRoleMode();
+      const nextMode = current === 'trainer' ? 'athlete' : 'trainer';
+      localStorage.setItem('titannovafit_active_mode', nextMode);
+      
+      updateRoleUI();
+      updateBottomNavForRole();
+      updateHomeScreenUI();
+      
+      const label = nextMode === 'trainer' ? 'Personal Trainer' : 'Atleta';
+      showToastNotification(`Modo alternado para: ${label}`);
+      
+      if (nextMode === 'trainer') {
+        switchTab('screenTrainerStudents');
+      } else {
+        switchTab('screenHome');
+      }
+    }
+
+    function updateBottomNavForRole() {
+      const navEl = document.getElementById('bottomNav');
+      if (!navEl) return;
+      const mode = getActiveRoleMode();
+      const activeScreen = localStorage.getItem('titannovafit_active_tab') || 'screenHome';
+
+      if (mode === 'trainer') {
+        navEl.innerHTML = `
+          <div class="nav-item ${activeScreen === 'screenTrainerStudents' ? 'active' : ''}" data-screen="screenTrainerStudents" onclick="switchTab('screenTrainerStudents', this)">
+            <div class="nav-icon">👥</div>
+            Alunos
+          </div>
+          <div class="nav-item ${activeScreen === 'screenWorkouts' ? 'active' : ''}" data-screen="screenWorkouts" onclick="switchTab('screenWorkouts', this)">
+            <div class="nav-icon">📋</div>
+            Treinos
+          </div>
+          <div class="nav-item ${activeScreen === 'screenExercises' ? 'active' : ''}" data-screen="screenExercises" onclick="switchTab('screenExercises', this)">
+            <div class="nav-icon">🏋️‍♂️</div>
+            Biblioteca
+          </div>
+          <div class="nav-item" onclick="openTrainerInviteModal()">
+            <div class="nav-icon">✉️</div>
+            Convites
+          </div>
+          <div class="nav-item ${activeScreen === 'screenProfile' ? 'active' : ''}" data-screen="screenProfile" onclick="switchTab('screenProfile', this)">
+            <div class="nav-icon">👤</div>
+            Perfil
+          </div>
+        `;
+      } else {
+        navEl.innerHTML = `
+          <div class="nav-item ${activeScreen === 'screenHome' ? 'active' : ''}" data-screen="screenHome" onclick="switchTab('screenHome', this)">
+            <div class="nav-icon">🏠</div>
+            Início
+          </div>
+          <div class="nav-item ${activeScreen === 'screenWorkouts' ? 'active' : ''}" data-screen="screenWorkouts" onclick="switchTab('screenWorkouts', this)">
+            <div class="nav-icon">📋</div>
+            Treinos
+          </div>
+          <div class="nav-item ${activeScreen === 'screenActiveWorkout' ? 'active' : ''}" data-screen="screenActiveWorkout" onclick="quickStartWorkoutNav(this)">
+            <div class="nav-icon" style="color: var(--accent-cyan);">⚡</div>
+            Executar
+          </div>
+          <div class="nav-item ${activeScreen === 'screenHistory' ? 'active' : ''}" data-screen="screenHistory" onclick="switchTab('screenHistory', this)">
+            <div class="nav-icon">📊</div>
+            Histórico
+          </div>
+          <div class="nav-item ${activeScreen === 'screenProfile' ? 'active' : ''}" data-screen="screenProfile" onclick="switchTab('screenProfile', this)">
+            <div class="nav-icon">👤</div>
+            Perfil
+          </div>
+        `;
+      }
+    }
+
+    function quickStartWorkoutNav(el) {
+      if (isWorkoutActive && currentActiveWorkout) {
+        resumeActiveWorkoutScreen();
+      } else {
+        const rec = (Array.isArray(allWorkoutsList) && allWorkoutsList.length > 0) ? allWorkoutsList[0] : { id: 'treino_temp_livre', nome: 'Treino Livre', exercicios: DEFAULT_WORKOUT_DIVISIONS[0].exercicios };
+        if (confirm(`Deseja iniciar o treino "${rec.nome}" agora?`)) {
+          startActiveWorkout(rec.id);
+        } else {
+          switchTab('screenWorkouts');
+        }
+      }
+    }
+
+    // ==========================================
+    // ONBOARDING INICIAL DO ATLETA E DO PERSONAL
+    // ==========================================
+    function openAthleteOnboardingModal() {
+      const modal = document.getElementById('modalAthleteOnboarding');
+      if (modal) modal.style.display = 'flex';
+    }
+
+    function closeAthleteOnboardingModal() {
+      const modal = document.getElementById('modalAthleteOnboarding');
+      if (modal) modal.style.display = 'none';
+    }
+
+    async function submitAthleteOnboarding() {
+      const goal = document.getElementById('onboardingAthleteGoal')?.value || 'Hipertrofia';
+      const level = document.querySelector('input[name="onboardingLevel"]:checked')?.value || 'Iniciante';
+      const days = document.getElementById('onboardingAthleteDays')?.value || '3';
+      const location = document.getElementById('onboardingAthleteLocation')?.value || 'Academia Completa';
+      const unit = document.getElementById('onboardingAthleteUnit')?.value || 'kg';
+      const rest = document.getElementById('onboardingAthleteRest')?.value || '60';
+      const path = document.querySelector('input[name="onboardingPath"]:checked')?.value || 'recommended';
+
+      const prefs = {
+        goal,
+        experience_level: level,
+        days_per_week: parseInt(days) || 3,
+        location,
+        unit,
+        default_rest_seconds: parseInt(rest) || 60,
+        selected_path: path,
+        completed_at: new Date().toISOString()
+      };
+
+      const uid = getEffectiveUserId();
+      if (uid) {
+        localStorage.setItem(`titannovafit_athlete_pref_${uid}`, JSON.stringify(prefs));
+        localStorage.setItem(`titannovafit_athlete_onboarded_${uid}`, 'true');
+      }
+      localStorage.setItem('titannovafit_athlete_pref', JSON.stringify(prefs));
+      localStorage.setItem('titannovafit_athlete_onboarded', 'true');
+
+      if (_supabase && uid && uid !== 'offline_user_local') {
+        try {
+          await _supabase.from('profiles').update({
+            goal: goal,
+            experience_level: level,
+            updated_at: new Date().toISOString()
+          }).eq('id', uid);
+        } catch (e) {
+          console.warn('[Onboarding Supabase Sync Error]:', e);
+        }
+      }
+
+      closeAthleteOnboardingModal();
+      showToastNotification('Preferências salvas com sucesso! Bons treinos.');
+
+      if (path === 'custom') {
+        openCreateWorkoutModal();
+      } else if (path === 'trainer') {
+        switchTab('screenProfile');
+        const personalSec = document.getElementById('athletePersonalSection');
+        if (personalSec) personalSec.scrollIntoView({ behavior: 'smooth' });
+      } else {
+        switchTab('screenWorkouts');
+      }
+    }
+
+    function openTrainerOnboardingModal() {
+      const modal = document.getElementById('modalTrainerOnboarding');
+      if (modal) modal.style.display = 'flex';
+    }
+
+    function closeTrainerOnboardingModal() {
+      const modal = document.getElementById('modalTrainerOnboarding');
+      if (modal) modal.style.display = 'none';
+    }
+
+    async function submitTrainerOnboarding() {
+      const name = document.getElementById('onboardingTrainerName')?.value?.trim();
+      if (!name) {
+        alert('Por favor, informe seu Nome Profissional.');
+        return;
+      }
+
+      const city = document.getElementById('onboardingTrainerCity')?.value?.trim() || '';
+      const state = document.getElementById('onboardingTrainerState')?.value?.trim()?.toUpperCase() || '';
+      const phone = document.getElementById('onboardingTrainerPhone')?.value?.trim() || '';
+      const bio = document.getElementById('onboardingTrainerBio')?.value?.trim() || '';
+      const crefNumber = document.getElementById('onboardingTrainerCREF')?.value?.trim() || '';
+      const crefState = document.getElementById('onboardingTrainerCREFState')?.value?.trim()?.toUpperCase() || state;
+
+      const checkedSpecs = Array.from(document.querySelectorAll('input[name="onboardingTrainerSpec"]:checked')).map(c => c.value);
+
+      const trainerData = {
+        professional_name: name,
+        city,
+        state,
+        phone,
+        bio,
+        cref_number: crefNumber,
+        cref_state: crefState,
+        specialties: checkedSpecs,
+        verification_status: 'pending'
+      };
+
+      const uid = getEffectiveUserId();
+      if (uid) {
+        localStorage.setItem(`titannovafit_trainer_profile_${uid}`, JSON.stringify(trainerData));
+        localStorage.setItem(`titannovafit_trainer_onboarded_${uid}`, 'true');
+      }
+      currentTrainerProfile = trainerData;
+
+      if (_supabase && uid && uid !== 'offline_user_local') {
+        try {
+          await _supabase.from('trainer_profiles').upsert({
+            user_id: uid,
+            ...trainerData,
+            updated_at: new Date().toISOString()
+          });
+
+          await _supabase.from('profiles').update({
+            account_type: 'trainer',
+            nome: name,
+            updated_at: new Date().toISOString()
+          }).eq('id', uid);
+
+          if (currentUserProfile) currentUserProfile.account_type = 'trainer';
+        } catch (e) {
+          console.warn('[Trainer Onboarding Sync Error]:', e);
+        }
+      }
+
+      closeTrainerOnboardingModal();
+      updateRoleUI();
+      showToastNotification('Perfil de Personal Trainer salvo com sucesso!');
+      switchTab('screenTrainerStudents');
+    }
+
+    function checkUserOnboarding() {
+      const uid = getEffectiveUserId();
+      if (!uid || uid === 'offline_user_local') return;
+
+      const isTrainer = (currentUserProfile?.account_type === 'trainer') || (getActiveRoleMode() === 'trainer');
+      if (isTrainer) {
+        const onboarded = localStorage.getItem(`titannovafit_trainer_onboarded_${uid}`) || (currentTrainerProfile && currentTrainerProfile.professional_name);
+        if (!onboarded) {
+          setTimeout(openTrainerOnboardingModal, 1200);
+        }
+      } else {
+        const onboarded = localStorage.getItem(`titannovafit_athlete_onboarded_${uid}`) || localStorage.getItem('titannovafit_athlete_onboarded');
+        if (!onboarded) {
+          setTimeout(openAthleteOnboardingModal, 1200);
+        }
+      }
+    }
+
+    // ==========================================
+    // STREAK & FICHAS ATRIBUÍDAS NA HOME
+    // ==========================================
+    function calculateConsecutiveStreak() {
+      const history = getWorkoutHistoryList();
+      if (!Array.isArray(history) || history.length === 0) return { streak: 0, unit: 'dias' };
+
+      const daysSet = new Set();
+      history.forEach(item => {
+        let ts = item.timestamp || (item.fimIso ? new Date(item.fimIso).getTime() : null);
+        if (!ts && item.id && item.id.startsWith('sessao_')) {
+          ts = parseInt(item.id.replace('sessao_', ''));
+        }
+        if (ts && !isNaN(ts)) {
+          const d = new Date(ts);
+          const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+          daysSet.add(key);
+        }
+      });
+
+      const today = new Date();
+      const formatKey = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      
+      let streak = 0;
+      let checkDate = new Date(today);
+
+      const todayKey = formatKey(checkDate);
+      if (!daysSet.has(todayKey)) {
+        checkDate.setDate(checkDate.getDate() - 1);
+      }
+
+      while (daysSet.has(formatKey(checkDate))) {
+        streak++;
+        checkDate.setDate(checkDate.getDate() - 1);
+      }
+
+      return { streak, unit: streak === 1 ? 'dia' : 'dias' };
+    }
+
+    function updateHomeStreakUI() {
+      const { streak, unit } = calculateConsecutiveStreak();
+      const countEl = document.getElementById('homeStreakCount');
+      const msgEl = document.getElementById('homeStreakMsg');
+      if (countEl) {
+        countEl.innerText = streak > 0 ? `🔥 ${streak} ${unit} seguidos` : '🔥 0 dias seguidos';
+      }
+      if (msgEl) {
+        msgEl.innerText = streak > 0 ? 'Excelente consistência! Mantenha a disciplina de campeão.' : 'Complete um treino hoje para iniciar sua sequência!';
+      }
+    }
+
+    async function updateHomeAssignedWorkoutsUI() {
+      const card = document.getElementById('homeAssignedWorkoutsCard');
+      const titleEl = document.getElementById('homeAssignedTitle');
+      const trainerEl = document.getElementById('homeAssignedTrainerName');
+      if (!card) return;
+
+      const uid = getEffectiveUserId();
+      if (!uid || uid === 'offline_user_local') {
+        card.style.display = 'none';
+        return;
+      }
+
+      try {
+        let assignedList = [];
+        const cached = localStorage.getItem(`titannovafit_assigned_workouts_${uid}`);
+        if (cached) assignedList = JSON.parse(cached);
+
+        if (_supabase) {
+          const { data } = await _supabase
+            .from('workout_assignments')
+            .select('*, trainer:trainer_id(professional_name, phone)')
+            .eq('athlete_id', uid)
+            .eq('status', 'active')
+            .order('assigned_at', { ascending: false })
+            .limit(1);
+
+          if (Array.isArray(data) && data.length > 0) {
+            assignedList = data;
+            localStorage.setItem(`titannovafit_assigned_workouts_${uid}`, JSON.stringify(data));
+          }
+        }
+
+        if (assignedList.length > 0) {
+          const first = assignedList[0];
+          const tName = first.trainer?.professional_name || 'Seu Personal Trainer';
+          if (titleEl) titleEl.innerText = first.workout_title || 'Ficha Prescrita';
+          if (trainerEl) trainerEl.innerText = `Prescrita por ${tName}`;
+          card.style.display = 'block';
+          card.setAttribute('data-assigned-id', first.id);
+          card.setAttribute('data-workout-id', first.workout_id || '');
+        } else {
+          card.style.display = 'none';
+        }
+      } catch (_) {
+        card.style.display = 'none';
+      }
+    }
+
+    function startAssignedWorkoutFromHome() {
+      const card = document.getElementById('homeAssignedWorkoutsCard');
+      const workoutId = card ? card.getAttribute('data-workout-id') : null;
+      if (workoutId) {
+        startActiveWorkout(workoutId);
+      } else {
+        switchTab('screenWorkouts');
+      }
+    }
+
     const AdminTrainersModule = {
       async loadAdminTrainersList() {
         const container = document.getElementById('adminTrainersListContainer');
