@@ -297,6 +297,20 @@ BEGIN
         RETURN jsonb_build_object('error', 'Usuário não autenticado');
     END IF;
 
+    -- Se for administrador oficial, retornar acesso administrativo irrestrito
+    IF EXISTS (SELECT 1 FROM public.admin_users WHERE user_id = v_user_id)
+       OR EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = v_user_id AND role = 'admin' AND active = true)
+       OR EXISTS (SELECT 1 FROM public.profiles WHERE id = v_user_id AND (account_type = 'admin' OR role = 'admin')) THEN
+        RETURN jsonb_build_object(
+            'is_admin', true,
+            'plan_code', 'admin',
+            'plan_name', 'Administrador (Acesso Total)',
+            'status', 'active',
+            'features', 'administrative_access',
+            'limits', null
+        );
+    END IF;
+
     -- Localizar assinatura ativa do usuário
     SELECT 
         s.id AS subscription_id,
@@ -430,6 +444,13 @@ BEGIN
         RETURN false;
     END IF;
 
+    -- Administrador possui acesso irrestrito
+    IF EXISTS (SELECT 1 FROM public.admin_users WHERE user_id = p_user_id)
+       OR EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = p_user_id AND role = 'admin' AND active = true)
+       OR EXISTS (SELECT 1 FROM public.profiles WHERE id = p_user_id AND (account_type = 'admin' OR role = 'admin')) THEN
+        RETURN true;
+    END IF;
+
     SELECT s.plan_id INTO v_plan_id
     FROM public.subscriptions s
     WHERE s.user_id = p_user_id AND s.status IN ('active', 'trialing')
@@ -458,6 +479,13 @@ DECLARE
 BEGIN
     IF p_user_id IS NULL THEN
         RETURN 0;
+    END IF;
+
+    -- Administrador não é submetido a limites numéricos
+    IF EXISTS (SELECT 1 FROM public.admin_users WHERE user_id = p_user_id)
+       OR EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = p_user_id AND role = 'admin' AND active = true)
+       OR EXISTS (SELECT 1 FROM public.profiles WHERE id = p_user_id AND (account_type = 'admin' OR role = 'admin')) THEN
+        RETURN NULL;
     END IF;
 
     SELECT s.plan_id INTO v_plan_id

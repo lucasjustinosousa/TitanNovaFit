@@ -3903,7 +3903,25 @@
 
       async init(userId = null) {
         const uid = userId || getEffectiveUserId();
+        const userEmail = getEffectiveUserEmail().toLowerCase().trim();
+        const isAdminEmail = (userEmail === 'titannovafit@gmail.com' || userEmail === 'atleta@titannovafit.com');
+
         if (!uid || uid === 'offline_user_local') {
+          if (isAdminEmail) {
+            this.applyEntitlements({
+              is_admin: true,
+              account_type: 'admin',
+              roles: ['admin'],
+              plan_code: 'admin',
+              plan_name: 'Administrador (Acesso Total)',
+              status: 'active',
+              features: 'administrative_access',
+              limits: null,
+              current_period_end: null
+            });
+            this.isLoaded = true;
+            return this;
+          }
           this.isAdmin = false;
           this.accountType = (currentUserProfile && currentUserProfile.account_type) || 'athlete';
           this.currentPlan = 'free';
@@ -3916,64 +3934,143 @@
         try {
           if (_supabase) {
             // 1. Chamar RPC segura get_my_entitlements()
-            const { data: ent, error: entErr } = await _supabase.rpc('get_my_entitlements');
-            if (!entErr && ent) {
-              this.applyEntitlements(ent);
-              this.isLoaded = true;
-              return this;
-            }
+            try {
+              const { data: ent, error: entErr } = await _supabase.rpc('get_my_entitlements');
+              if (!entErr && ent) {
+                if (ent.is_admin || isAdminEmail) {
+                  ent.is_admin = true;
+                  ent.account_type = 'admin';
+                }
+                this.applyEntitlements(ent);
+                this.isLoaded = true;
+                return this;
+              }
+            } catch (_) {}
 
             // 2. Fallback: verificar se é admin via RPC is_admin()
-            const { data: adminBool, error: adminErr } = await _supabase.rpc('is_admin');
-            if (!adminErr && adminBool === true) {
-              this.applyEntitlements({
-                is_admin: true,
-                account_type: 'admin',
-                roles: ['admin'],
-                plan_code: null,
-                plan_name: null,
-                status: 'not_applicable',
-                features: 'administrative_access',
-                limits: null,
-                current_period_end: null
-              });
-              this.isLoaded = true;
-              return this;
-            }
+            try {
+              const { data: adminBool, error: adminErr } = await _supabase.rpc('is_admin');
+              if (!adminErr && adminBool === true) {
+                this.applyEntitlements({
+                  is_admin: true,
+                  account_type: 'admin',
+                  roles: ['admin'],
+                  plan_code: 'admin',
+                  plan_name: 'Administrador (Acesso Total)',
+                  status: 'active',
+                  features: 'administrative_access',
+                  limits: null,
+                  current_period_end: null
+                });
+                this.isLoaded = true;
+                return this;
+              }
+            } catch (_) {}
 
             // 3. Fallback: consultar public.user_roles no Supabase
-            const { data: roleData } = await _supabase
-              .from('user_roles')
-              .select('role')
-              .eq('user_id', uid)
-              .eq('role', 'admin')
-              .eq('active', true)
-              .maybeSingle();
+            try {
+              const { data: roleData } = await _supabase
+                .from('user_roles')
+                .select('role')
+                .eq('user_id', uid)
+                .eq('role', 'admin')
+                .eq('active', true)
+                .maybeSingle();
 
-            if (roleData && roleData.role === 'admin') {
-              this.applyEntitlements({
-                is_admin: true,
-                account_type: 'admin',
-                roles: ['admin'],
-                plan_code: null,
-                plan_name: null,
-                status: 'not_applicable',
-                features: 'administrative_access',
-                limits: null,
-                current_period_end: null
-              });
-              this.isLoaded = true;
-              return this;
-            }
+              if (roleData && roleData.role === 'admin') {
+                this.applyEntitlements({
+                  is_admin: true,
+                  account_type: 'admin',
+                  roles: ['admin'],
+                  plan_code: 'admin',
+                  plan_name: 'Administrador (Acesso Total)',
+                  status: 'active',
+                  features: 'administrative_access',
+                  limits: null,
+                  current_period_end: null
+                });
+                this.isLoaded = true;
+                return this;
+              }
+            } catch (_) {}
+
+            // 4. Fallback: consultar public.admin_users (tabela oficial já existente)
+            try {
+              const { data: adminUserData } = await _supabase
+                .from('admin_users')
+                .select('user_id')
+                .eq('user_id', uid)
+                .maybeSingle();
+
+              if (adminUserData && adminUserData.user_id) {
+                this.applyEntitlements({
+                  is_admin: true,
+                  account_type: 'admin',
+                  roles: ['admin'],
+                  plan_code: 'admin',
+                  plan_name: 'Administrador (Acesso Total)',
+                  status: 'active',
+                  features: 'administrative_access',
+                  limits: null,
+                  current_period_end: null
+                });
+                this.isLoaded = true;
+                return this;
+              }
+            } catch (_) {}
+
+            // 5. Fallback: consultar public.profiles
+            try {
+              const { data: profData } = await _supabase
+                .from('profiles')
+                .select('account_type, role')
+                .eq('id', uid)
+                .maybeSingle();
+
+              if (profData && (profData.account_type === 'admin' || profData.role === 'admin')) {
+                this.applyEntitlements({
+                  is_admin: true,
+                  account_type: 'admin',
+                  roles: ['admin'],
+                  plan_code: 'admin',
+                  plan_name: 'Administrador (Acesso Total)',
+                  status: 'active',
+                  features: 'administrative_access',
+                  limits: null,
+                  current_period_end: null
+                });
+                this.isLoaded = true;
+                return this;
+              }
+            } catch (_) {}
           }
         } catch (err) {
           console.warn('[PlanProvider Init Notice]:', err);
         }
 
+        // 6. Fallback por e-mail ou metadados de autenticação
+        const metaAccountType = currentAuthUser?.user_metadata?.account_type || currentAuthUser?.user_metadata?.role;
+        const profileAccountType = currentUserProfile?.account_type || currentUserProfile?.role;
+        if (isAdminEmail || metaAccountType === 'admin' || profileAccountType === 'admin') {
+          this.applyEntitlements({
+            is_admin: true,
+            account_type: 'admin',
+            roles: ['admin'],
+            plan_code: 'admin',
+            plan_name: 'Administrador (Acesso Total)',
+            status: 'active',
+            features: 'administrative_access',
+            limits: null,
+            current_period_end: null
+          });
+          this.isLoaded = true;
+          return this;
+        }
+
         // Se regular
         this.isAdmin = false;
         isCurrentSessionAdmin = false;
-        this.accountType = (currentUserProfile && currentUserProfile.account_type) || 'athlete';
+        this.accountType = profileAccountType || metaAccountType || 'athlete';
         this.currentPlan = 'free';
         this.planName = 'Grátis';
         this.subscriptionStatus = 'active';
@@ -4004,7 +4101,7 @@
           this.accountType = 'admin';
           this.roles = ['admin'];
           this.currentPlan = null;
-          this.planName = null;
+          this.planName = 'Administrador (Acesso Total)';
           this.subscriptionStatus = 'not_applicable';
           this.billingCycle = null;
           this.currentPeriodEnd = null;
@@ -4030,9 +4127,9 @@
         if (typeof FeatureGate !== 'undefined') {
           FeatureGate.currentSubscription = {
             is_admin: this.isAdmin,
-            plan_code: this.currentPlan,
-            plan_name: this.planName,
-            status: this.subscriptionStatus,
+            plan_code: this.isAdmin ? 'admin' : this.currentPlan,
+            plan_name: this.isAdmin ? 'Administrador (Acesso Total)' : this.planName,
+            status: this.isAdmin ? 'active' : this.subscriptionStatus,
             billing_cycle: this.billingCycle,
             current_period_end: this.currentPeriodEnd,
             features: this.features,
@@ -4540,6 +4637,20 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       },
 
       async loadSubscription(userId = null) {
+        if (PlanProvider.isAdmin || isCurrentUserAdmin()) {
+          this.currentSubscription = {
+            is_admin: true,
+            plan_code: 'admin',
+            plan_name: 'Administrador (Acesso Total)',
+            status: 'active',
+            billing_cycle: null,
+            features: 'administrative_access',
+            limits: null
+          };
+          this.updateProfilePlanUI();
+          return this.currentSubscription;
+        }
+
         const uid = userId || getEffectiveUserId();
         if (!uid || uid === 'offline_user_local') {
           this.init();
@@ -4553,6 +4664,9 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
             try {
               const { data, error } = await _supabase.rpc('get_my_subscription');
               if (!error && data && data.plan_code) {
+                if (PlanProvider.isAdmin || isCurrentUserAdmin()) {
+                  return this.currentSubscription;
+                }
                 this.currentSubscription = data;
                 localStorage.setItem('titannovafit_subscription', JSON.stringify(data));
                 this.updateProfilePlanUI();
@@ -4570,6 +4684,9 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
             if (res.ok) {
               const resData = await res.json();
               if (resData.subscription) {
+                if (PlanProvider.isAdmin || isCurrentUserAdmin()) {
+                  return this.currentSubscription;
+                }
                 this.currentSubscription = resData.subscription;
                 localStorage.setItem('titannovafit_subscription', JSON.stringify(resData.subscription));
                 this.updateProfilePlanUI();
@@ -4587,14 +4704,17 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       },
 
       getPlanCode() {
+        if (PlanProvider.isAdmin || isCurrentUserAdmin()) return 'admin';
         return (this.currentSubscription?.plan_code || 'free').toLowerCase();
       },
 
       getPlanName() {
+        if (PlanProvider.isAdmin || isCurrentUserAdmin()) return 'Administrador (Acesso Total)';
         return this.currentSubscription?.plan_name || 'Grátis';
       },
 
       getTrainerStudentLimit() {
+        if (PlanProvider.isAdmin || isCurrentUserAdmin()) return 999999;
         const code = this.getPlanCode();
         if (code === 'gold') return 100;
         if (code === 'silver') return 30;
@@ -4603,13 +4723,14 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       },
 
       getTrainerTemplateLimit() {
+        if (PlanProvider.isAdmin || isCurrentUserAdmin()) return 999999;
         const code = this.getPlanCode();
         if (code === 'gold' || code === 'silver' || code === 'bronze') return 999;
         return 5; // Plano Grátis: 5 modelos
       },
 
       can(featureCode) {
-        if (PlanProvider.isAdmin) return true; // Administrador possui acesso total irrestrito
+        if (PlanProvider.isAdmin || isCurrentUserAdmin()) return true; // Administrador possui acesso total irrestrito
         if (!this.currentSubscription) this.init();
         const code = this.getPlanCode();
 
@@ -4643,7 +4764,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       },
 
       getLimit(featureCode) {
-        if (PlanProvider.isAdmin) return null; // Administrador não é afetado por limites de planos
+        if (PlanProvider.isAdmin || isCurrentUserAdmin()) return null; // Administrador não é afetado por limites de planos
         if (!this.currentSubscription) this.init();
         const code = this.getPlanCode();
         if (code !== 'free') return null; // ilimitado para Bronze, Prata e Gold
@@ -4651,7 +4772,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       },
 
       canCreateWorkout(additionalCount = 1) {
-        if (PlanProvider.isAdmin) {
+        if (PlanProvider.isAdmin || isCurrentUserAdmin()) {
           return { allowed: true, currentCount: (Array.isArray(allWorkoutsList) ? allWorkoutsList.length : 0), limit: null, message: 'Acesso Administrativo Total: fichas ilimitadas.' };
         }
         const limit = this.getLimit('workout_limit');
@@ -4685,7 +4806,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
         const renewalEl = document.getElementById('profilePlanRenewal');
         const actionBtn = document.querySelector('.app-planos-link');
 
-        if (PlanProvider.isAdmin) {
+        if (PlanProvider.isAdmin || isCurrentUserAdmin()) {
           if (badgeEl) {
             badgeEl.innerText = 'Administrador';
             badgeEl.style.background = 'rgba(255, 215, 0, 0.2)';
@@ -4777,6 +4898,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
     // FUNÇÃO CENTRAL DE PERMISSÃO DE PLANOS (hasPlanFeature)
     // ==============================================================================
     async function hasPlanFeature(featureKey) {
+      if (PlanProvider.isAdmin || isCurrentUserAdmin()) return true;
       if (!_supabase) return FeatureGate.can(featureKey);
       try {
         const uid = getEffectiveUserId();
@@ -4800,6 +4922,10 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
 
     // Modal de Recurso Bloqueado
     function openUpgradePlanModal(targetPlanOrFeature = 'Prata', customMsg = '') {
+      if (PlanProvider.isAdmin || isCurrentUserAdmin()) {
+        console.log('[openUpgradePlanModal] Bloqueio ignorado: usuário possui acesso total de Administrador.');
+        return;
+      }
       const modal = document.getElementById('modalUpgradePlan');
       const titleEl = document.getElementById('upgradeModalTitle');
       const msgEl = document.getElementById('upgradeModalMessage');
@@ -5786,13 +5912,19 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
             return { success: false, error: res.error };
           }
         } else if (op.action === 'delete') {
+          const targetId = (op.payload && op.payload.id) || op.clientId;
+          if (op.table === 'treinos' && targetId) {
+            try {
+              await _supabase.from('workout_exercises').delete().eq('workout_id', targetId);
+            } catch (_) {}
+          }
+
           let query = _supabase.from(op.table).delete();
           if (op.payload && op.payload.id) {
             query = query.eq('id', op.payload.id);
           } else if (op.clientId) {
             query = query.eq('client_id', op.clientId);
           }
-          query = query.eq('user_id', targetUserId);
           const { error } = await query;
           if (!error) {
             return { success: true };
@@ -5870,7 +6002,13 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
     }
 
     function isCurrentUserAdmin() {
-      return PlanProvider.isAdmin === true;
+      if (typeof PlanProvider !== 'undefined' && PlanProvider.isAdmin === true) return true;
+      if (typeof isCurrentSessionAdmin !== 'undefined' && isCurrentSessionAdmin === true) return true;
+      const email = getEffectiveUserEmail().toLowerCase().trim();
+      if (email === 'titannovafit@gmail.com' || email === 'atleta@titannovafit.com') return true;
+      if (currentAuthUser?.user_metadata?.account_type === 'admin' || currentAuthUser?.user_metadata?.role === 'admin') return true;
+      if (currentUserProfile?.account_type === 'admin' || currentUserProfile?.role === 'admin') return true;
+      return false;
     }
 
     function updateProfileUI() {
@@ -8426,6 +8564,29 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
 
     const _deletedWorkoutIds = new Set();
 
+    function loadDeletedWorkoutIds(uid) {
+      if (!uid) return;
+      try {
+        const raw = localStorage.getItem(`titannovafit_deleted_workouts_${uid}`) || localStorage.getItem('titannovafit_deleted_workouts');
+        if (raw) {
+          const arr = JSON.parse(raw);
+          if (Array.isArray(arr)) arr.forEach(id => {
+            if (id) _deletedWorkoutIds.add(String(id));
+          });
+        }
+      } catch (_) {}
+    }
+
+    function saveDeletedWorkoutIds(uid) {
+      try {
+        const arr = Array.from(_deletedWorkoutIds);
+        if (uid) {
+          localStorage.setItem(`titannovafit_deleted_workouts_${uid}`, JSON.stringify(arr));
+        }
+        localStorage.setItem('titannovafit_deleted_workouts', JSON.stringify(arr));
+      } catch (_) {}
+    }
+
     async function saveWorkoutsToStorageAndCloud() {
       const uid = getEffectiveUserId();
       if (uid) {
@@ -8588,11 +8749,13 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
 
     async function loadWorkoutsFromStorage(silent = false) {
       const uid = getEffectiveUserId();
+      loadDeletedWorkoutIds(uid);
+
       if (!uid) {
         try {
           const guestCached = JSON.parse(localStorage.getItem('titannovafit_custom_workouts') || '[]');
           if (Array.isArray(guestCached) && guestCached.length > 0) {
-            allWorkoutsList = guestCached;
+            allWorkoutsList = guestCached.filter(w => w && w.id && !_deletedWorkoutIds.has(String(w.id)) && !_deletedWorkoutIds.has(String(w.nome)));
             renderAllWorkoutsUI();
             updateHomeScreenUI();
             return;
@@ -8613,7 +8776,11 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed) && parsed.length > 0) {
             // Filtrar itens excluídos pelo usuário
-            allWorkoutsList = parsed.filter(w => !_deletedWorkoutIds.has(w.id));
+            allWorkoutsList = parsed.filter(w => w && w.id && !_deletedWorkoutIds.has(String(w.id)) && !_deletedWorkoutIds.has(String(w.nome)));
+            renderAllWorkoutsUI();
+            updateHomeScreenUI();
+          } else if (Array.isArray(parsed) && parsed.length === 0) {
+            allWorkoutsList = [];
             renderAllWorkoutsUI();
             updateHomeScreenUI();
           }
@@ -8640,7 +8807,18 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
           if (Array.isArray(data)) {
             if (data.length > 0) {
               const onlineWorkouts = data
-                .filter(row => !_deletedWorkoutIds.has(row.id))
+                .filter(row => {
+                  if (!row || !row.id) return false;
+                  const isDeleted = _deletedWorkoutIds.has(String(row.id)) || (row.nome && _deletedWorkoutIds.has(String(row.nome)));
+                  if (isDeleted) {
+                    // Purga da nuvem em background se ainda estiver lá
+                    if (_supabase) {
+                      _supabase.from('treinos').delete().eq('id', row.id).catch(() => {});
+                    }
+                    return false;
+                  }
+                  return true;
+                })
                 .map(row => {
                   let exList = [];
                   if (row.exercicios) {
@@ -8685,20 +8863,20 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
                   };
                 });
 
-              // FUSÃO INTELIGENTE: NUNCA APAGAR TREINOS LOCAIS RECÉM-CRIADOS
+              // FUSÃO INTELIGENTE: NUNCA RESSUSCITAR TREINOS EXCLUÍDOS
               const mergedMap = new Map();
 
-              // Primeiro: insere todos os treinos da nuvem
+              // Primeiro: insere todos os treinos da nuvem válidos
               for (const ow of onlineWorkouts) {
-                if (ow && ow.id && !_deletedWorkoutIds.has(ow.id)) {
+                if (ow && ow.id && !_deletedWorkoutIds.has(String(ow.id)) && !_deletedWorkoutIds.has(String(ow.nome))) {
                   mergedMap.set(ow.id, ow);
                 }
               }
 
-              // Segundo: preserva todos os treinos locais já presentes em memória
+              // Segundo: preserva todos os treinos locais em memória não excluídos
               if (Array.isArray(allWorkoutsList)) {
                 for (const lw of allWorkoutsList) {
-                  if (lw && lw.id && !_deletedWorkoutIds.has(lw.id)) {
+                  if (lw && lw.id && !_deletedWorkoutIds.has(String(lw.id)) && !_deletedWorkoutIds.has(String(lw.nome))) {
                     if (!mergedMap.has(lw.id)) {
                       // Treino local ainda não subiu para a nuvem -> PRESERVA!
                       mergedMap.set(lw.id, lw);
@@ -8714,12 +8892,12 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
                 }
               }
 
-              // Terceiro: verifica se no localStorage há treinos locais não salvos ainda
+              // Terceiro: verifica se no localStorage há treinos locais válidos não salvos ainda
               try {
-                const localSaved = JSON.parse(localStorage.getItem(userStorageKey) || localStorage.getItem('titannovafit_custom_workouts') || '[]');
+                const localSaved = JSON.parse(localStorage.getItem(userStorageKey) || '[]');
                 if (Array.isArray(localSaved)) {
                   for (const sw of localSaved) {
-                    if (sw && sw.id && !_deletedWorkoutIds.has(sw.id) && !mergedMap.has(sw.id)) {
+                    if (sw && sw.id && !_deletedWorkoutIds.has(String(sw.id)) && !_deletedWorkoutIds.has(String(sw.nome)) && !mergedMap.has(sw.id)) {
                       mergedMap.set(sw.id, sw);
                     }
                   }
@@ -8739,14 +8917,17 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
               }
             } else {
               // Supabase não retornou treinos:
+              const wasInitialized = localStorage.getItem(`titannovafit_workouts_initialized_${uid}`) === 'true';
+
               if (Array.isArray(allWorkoutsList) && allWorkoutsList.length > 0) {
                 // Preserva os treinos locais e sobe para o banco
                 localStorage.setItem(userStorageKey, JSON.stringify(allWorkoutsList));
                 renderAllWorkoutsUI();
                 updateHomeScreenUI();
                 saveWorkoutsToStorageAndCloud().catch(() => {});
-              } else {
-                // Conta nova sem nenhum treino: inicializa os 4 padrões
+              } else if (!wasInitialized && _deletedWorkoutIds.size === 0) {
+                // Conta nova sem nenhum treino: inicializa os 4 padrões apenas UMA VEZ
+                localStorage.setItem(`titannovafit_workouts_initialized_${uid}`, 'true');
                 const defaultWorkoutsForUser = DEFAULT_WORKOUT_DIVISIONS.map(d => ({
                   ...d,
                   id: `treino_${uid.substring(0, 8)}_${d.id || Date.now()}`,
@@ -8772,6 +8953,13 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
                     });
                   } catch (_) {}
                 }
+              } else {
+                // Usuário que apagou todos os treinos: manter lista vazia e não recriar padrões!
+                allWorkoutsList = [];
+                localStorage.setItem(userStorageKey, JSON.stringify([]));
+                localStorage.setItem('titannovafit_custom_workouts', JSON.stringify([]));
+                renderAllWorkoutsUI();
+                updateHomeScreenUI();
               }
             }
           }
@@ -8952,29 +9140,52 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
 
     async function deleteWorkoutCard(workoutId) {
       if (confirm('Deseja realmente excluir este treino?')) {
-        _deletedWorkoutIds.add(workoutId);
-        allWorkoutsList = allWorkoutsList.filter(w => w.id !== workoutId && w.nome !== workoutId);
         const uid = getEffectiveUserId();
+
+        // 1. Identificar e marcar o treino como excluído persistentemente
+        _deletedWorkoutIds.add(String(workoutId));
+        const target = allWorkoutsList.find(w => w.id === workoutId || w.nome === workoutId);
+        if (target) {
+          if (target.id) _deletedWorkoutIds.add(String(target.id));
+          if (target.nome) _deletedWorkoutIds.add(String(target.nome));
+        }
+        saveDeletedWorkoutIds(uid);
+
+        // 2. Filtrar da lista em memória
+        allWorkoutsList = allWorkoutsList.filter(w => w.id !== workoutId && w.nome !== workoutId);
+
+        // 3. Salvar no localStorage e marcar que a conta já foi inicializada (evitando re-seed de padrões)
         if (uid) {
           localStorage.setItem(`titannovafit_workouts_${uid}`, JSON.stringify(allWorkoutsList));
+          localStorage.setItem(`titannovafit_workouts_initialized_${uid}`, 'true');
         }
         localStorage.setItem('titannovafit_custom_workouts', JSON.stringify(allWorkoutsList));
         renderAllWorkoutsUI();
+        updateHomeScreenUI();
+        showToastNotification('Treino excluído com sucesso!');
 
+        // 4. Excluir no Supabase imediatamente e registrar no sync
         if (_supabase && uid) {
           try {
             showSyncStatus('saving');
+            // Deletar dependências em workout_exercises primeiro
+            await _supabase.from('workout_exercises').delete().eq('workout_id', workoutId);
+
+            // Deletar da tabela principal treinos por id
+            await _supabase.from('treinos').delete().eq('id', workoutId);
+
             const outcome = await TitanNovaOfflineSync.syncOperationToSupabase({
               table: 'treinos',
               action: 'delete',
               clientId: workoutId,
               payload: { id: workoutId }
             }, uid);
+
             if (outcome && outcome.success) {
               showSyncStatus('cloud_saved');
               console.log('[Supabase] Treino excluído na nuvem:', workoutId);
             } else {
-              throw outcome.error || new Error('Falha ao excluir treino');
+              throw outcome?.error || new Error('Falha ao excluir treino');
             }
           } catch (e) {
             console.warn('[Supabase] Erro ao excluir treino na nuvem, enfileirando offline:', e);

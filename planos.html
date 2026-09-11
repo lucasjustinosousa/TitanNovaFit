@@ -1169,7 +1169,12 @@
           const { data: sessionData } = await _supabase.auth.getSession();
           const user = sessionData?.session?.user;
           if (user) {
-            // Verificar admin
+            const email = (user.email || '').toLowerCase().trim();
+            if (email === 'titannovafit@gmail.com' || email === 'atleta@titannovafit.com' || user.user_metadata?.account_type === 'admin' || user.user_metadata?.role === 'admin') {
+              isViewerAdmin = true;
+            }
+
+            // Verificar admin via RPC
             try {
               const { data: ent } = await _supabase.rpc('get_my_entitlements');
               if (ent) {
@@ -1180,8 +1185,24 @@
                 }
               }
             } catch (_) {
-              const { data: adminBool } = await _supabase.rpc('is_admin');
-              if (adminBool === true) isViewerAdmin = true;
+              try {
+                const { data: adminBool } = await _supabase.rpc('is_admin');
+                if (adminBool === true) isViewerAdmin = true;
+              } catch (_) {}
+            }
+
+            if (!isViewerAdmin) {
+              try {
+                const { data: au } = await _supabase.from('admin_users').select('user_id').eq('user_id', user.id).maybeSingle();
+                if (au && au.user_id) isViewerAdmin = true;
+              } catch (_) {}
+            }
+
+            if (!isViewerAdmin) {
+              try {
+                const { data: ur } = await _supabase.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'admin').eq('active', true).maybeSingle();
+                if (ur && ur.role === 'admin') isViewerAdmin = true;
+              } catch (_) {}
             }
           }
         }
