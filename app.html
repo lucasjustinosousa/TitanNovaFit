@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>TitanNova Fit — Aplicativo Oficial de Treinos</title>
 
+  <!-- Content Security Policy (sem unsafe-eval) -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https: data: blob:; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self';">
+
+
   <!-- PWA Meta Tags & Manifest -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1e88e5">
@@ -3810,6 +3814,17 @@
   </div>
 
   <script>
+    // Sanitização centralizada de HTML para prevenção de XSS (Fase 5)
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+    window.escapeHtml = escapeHtml;
     console.log("[BOOT 1] App iniciou");
     // Migração automática transparente de dados legados (jtech_fit_* -> titannovafit_*)
     (function migrateLegacyStorage() {
@@ -5094,10 +5109,10 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
                 <span style="font-size: 20px;">${icon}</span>
                 <div style="min-width: 0;">
                   <div style="font-size: 13px; font-weight: 800; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                    ${name}
+                    ${escapeHtml(name)}
                   </div>
                   <div style="font-size: 11px; color: var(--accent-cyan); margin-top: 1px;">
-                    ${group} • <span style="color: var(--text-grey);">${equip}</span>
+                    ${escapeHtml(group)} • <span style="color: var(--text-grey);">${escapeHtml(equip)}</span>
                   </div>
                 </div>
               </div>
@@ -5105,13 +5120,13 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
                 <span style="font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 6px; background: ${isActive ? 'rgba(76,175,80,0.18)' : 'rgba(255,82,82,0.18)'}; color: ${isActive ? 'var(--success-green)' : '#ff5252'}; border: 1px solid ${isActive ? 'rgba(76,175,80,0.35)' : 'rgba(255,82,82,0.35)'};">
                   ${isActive ? 'ATIVO' : 'DESATIVADO'}
                 </span>
-                <button onclick="openAdminEditExerciseModal('${id}')" class="btn btn-outline" style="width: auto; padding: 4px 8px; font-size: 11px; color: var(--accent-cyan); border-color: rgba(0,210,255,0.4);" title="Editar Exercício">
+                <button data-id="${escapeHtml(id)}" onclick="openAdminEditExerciseModal(this.dataset.id)" class="btn btn-outline" style="width: auto; padding: 4px 8px; font-size: 11px; color: var(--accent-cyan); border-color: rgba(0,210,255,0.4);" title="Editar Exercício">
                   ✏️
                 </button>
-                <button onclick="toggleAdminExerciseActive('${id}')" class="btn btn-outline" style="width: auto; padding: 4px 8px; font-size: 11px; color: ${isActive ? 'var(--warning-orange)' : 'var(--success-green)'}; border-color: rgba(255,152,0,0.4);" title="${isActive ? 'Desativar' : 'Ativar'} Exercício">
+                <button data-id="${escapeHtml(id)}" onclick="toggleAdminExerciseActive(this.dataset.id)" class="btn btn-outline" style="width: auto; padding: 4px 8px; font-size: 11px; color: ${isActive ? 'var(--warning-orange)' : 'var(--success-green)'}; border-color: rgba(255,152,0,0.4);" title="${isActive ? 'Desativar' : 'Ativar'} Exercício">
                   ${isActive ? '👁️ Desativar' : '✓ Ativar'}
                 </button>
-                <button onclick="deleteAdminExercise('${id}')" style="background: none; border: none; font-size: 14px; color: var(--error-red); cursor: pointer; padding: 4px;" title="Excluir Permanentemente">
+                <button data-id="${escapeHtml(id)}" onclick="deleteAdminExercise(this.dataset.id)" style="background: none; border: none; font-size: 14px; color: var(--error-red); cursor: pointer; padding: 4px;" title="Excluir Permanentemente">
                   🗑️
                 </button>
               </div>
@@ -5401,10 +5416,10 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
 
             <div style="display: flex; gap: 6px; margin-top: 10px;">
               ${!isSelf ? `
-                <button onclick="adminToggleUserSuspend('${u.id}', ${!isSuspended})" class="btn btn-outline" style="flex: 1; padding: 6px; font-size: 11px; border-color: ${isSuspended ? 'var(--success-green)' : '#ff5252'}; color: ${isSuspended ? 'var(--success-green)' : '#ff5252'};">
+                <button data-userid="${escapeHtml(u.id)}" data-suspend="${!isSuspended}" onclick="adminToggleUserSuspend(this.dataset.userid, this.dataset.suspend === 'true')" class="btn btn-outline" style="flex: 1; padding: 6px; font-size: 11px; border-color: ${isSuspended ? 'var(--success-green)' : '#ff5252'}; color: ${isSuspended ? 'var(--success-green)' : '#ff5252'};">
                   ${isSuspended ? 'Reativar Conta' : 'Suspender Conta'}
                 </button>
-                <button onclick="adminSelectUserForPlan('${escapeHtml(u.email)}')" class="btn btn-primary" style="width: auto; padding: 6px 12px; font-size: 11px; font-weight: 800;">
+                <button data-email="${escapeHtml(u.email || '')}" onclick="adminSelectUserForPlan(this.dataset.email)" class="btn btn-primary" style="width: auto; padding: 6px 12px; font-size: 11px; font-weight: 800;">
                   Atribuir Plano
                 </button>
               ` : `
@@ -6393,7 +6408,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
 
       const email = currentAuthUser ? (currentAuthUser.email || 'Usuário Atual') : 'Não autenticado';
       if (statusEl) {
-        statusEl.innerHTML = `Conta autenticada: <strong style="color: white;">${email}</strong>`;
+        statusEl.innerHTML = `Conta autenticada: <strong style="color: white;">${escapeHtml(email)}</strong>`;
       }
       if (modal) {
         modal.classList.add('active');
@@ -9028,23 +9043,23 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
           <div class="card ${isExpanded ? 'workout-card-expanded' : ''}" id="card_${w.id}" style="border-left: 5px solid ${color}; padding: ${isExpanded ? '20px 22px' : '16px'}; animation: fadeIn 0.25s ease-in-out; ${isExpanded ? 'grid-column: 1 / -1; z-index: 5;' : ''}">
             <div style="display: flex; justify-content: space-between; align-items: flex-start;">
               <div style="flex: 1; min-width: 0;">
-                <h4 style="font-size: ${isExpanded ? '18px' : '16px'}; font-weight: 800; color: white; margin-bottom: 2px;">${w.nome}</h4>
-                <p style="font-size: 11px; color: var(--text-grey); margin: 0;">${daysStr}</p>
-                ${w.descricao ? `<span style="display: inline-block; background: rgba(0,210,255,0.12); color: var(--accent-cyan); font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; margin-top: 6px;">${w.descricao}</span>` : ''}
+                <h4 style="font-size: ${isExpanded ? '18px' : '16px'}; font-weight: 800; color: white; margin-bottom: 2px;">${escapeHtml(w.nome)}</h4>
+                <p style="font-size: 11px; color: var(--text-grey); margin: 0;">${escapeHtml(daysStr)}</p>
+                ${w.descricao ? `<span style="display: inline-block; background: rgba(0,210,255,0.12); color: var(--accent-cyan); font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; margin-top: 6px;">${escapeHtml(w.descricao)}</span>` : ''}
               </div>
               <div style="display: flex; gap: 4px; align-items: center;">
-                <button onclick="duplicateWorkout('${w.id}')" style="background: none; border: none; color: var(--accent-cyan); cursor: pointer; font-size: 15px; padding: 4px;" title="Duplicar treino (Clonar)">📑</button>
-                <button onclick="shareWorkoutWhatsApp('${w.id}')" style="background: none; border: none; color: #25D366; cursor: pointer; font-size: 15px; padding: 4px;" title="Compartilhar via WhatsApp">💬</button>
-                <button onclick="deleteWorkoutCard('${w.id}')" style="background: none; border: none; color: var(--error-red); cursor: pointer; font-size: 15px; padding: 4px;" title="Excluir treino">🗑️</button>
+                <button data-id="${escapeHtml(w.id)}" onclick="duplicateWorkout(this.dataset.id)" style="background: none; border: none; color: var(--accent-cyan); cursor: pointer; font-size: 15px; padding: 4px;" title="Duplicar treino (Clonar)">📑</button>
+                <button data-id="${escapeHtml(w.id)}" onclick="shareWorkoutWhatsApp(this.dataset.id)" style="background: none; border: none; color: #25D366; cursor: pointer; font-size: 15px; padding: 4px;" title="Compartilhar via WhatsApp">💬</button>
+                <button data-id="${escapeHtml(w.id)}" onclick="deleteWorkoutCard(this.dataset.id)" style="background: none; border: none; color: var(--error-red); cursor: pointer; font-size: 15px; padding: 4px;" title="Excluir treino">🗑️</button>
               </div>
             </div>
 
             <!-- Botão para Expandir / Recolher Exercícios Montados -->
             <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--divider);">
-              <button onclick="toggleWorkoutCardExpand('${w.id}', event)" style="background: ${isExpanded ? 'rgba(0,210,255,0.15)' : 'none'}; border: ${isExpanded ? '1px solid var(--accent-cyan)' : 'none'}; border-radius: 6px; padding: ${isExpanded ? '4px 10px' : '0'}; font-size: 12px; font-weight: 700; color: var(--accent-cyan); cursor: pointer; display: flex; align-items: center; gap: 4px;">
+              <button data-id="${escapeHtml(w.id)}" onclick="toggleWorkoutCardExpand(this.dataset.id, event)" style="background: ${isExpanded ? 'rgba(0,210,255,0.15)' : 'none'}; border: ${isExpanded ? '1px solid var(--accent-cyan)' : 'none'}; border-radius: 6px; padding: ${isExpanded ? '4px 10px' : '0'}; font-size: 12px; font-weight: 700; color: var(--accent-cyan); cursor: pointer; display: flex; align-items: center; gap: 4px;">
                 <span>${isExpanded ? '▲ Ocultar Exercícios' : `▼ Ver Exercícios Montados (${count})`}</span>
               </button>
-              <button onclick="startActiveWorkout('${w.id}')" class="btn btn-success" style="width: auto; padding: 7px 18px; font-size: 12px; font-weight: 800; border-radius: 8px;">
+              <button data-id="${escapeHtml(w.id)}" onclick="startActiveWorkout(this.dataset.id)" class="btn btn-success" style="width: auto; padding: 7px 18px; font-size: 12px; font-weight: 800; border-radius: 8px;">
                 ▶ INICIAR
               </button>
             </div>
@@ -9084,14 +9099,14 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
                     return `
                       <div class="workout-exercise-row" style="background: #080a0f; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--divider); display: flex; flex-direction: column; gap: 10px; box-shadow: 0 4px 14px rgba(0,0,0,0.3);">
                         <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
-                          <div onclick="event.stopPropagation(); openOnlyGifModal('${safeName}')" style="display: flex; align-items: center; gap: 10px; min-width: 0; cursor: pointer; flex: 1;" title="Toque para ver animação ampliada com zoom 3D">
+                          <div data-name="${escapeHtml(ex.nome || 'Exercício')}" onclick="event.stopPropagation(); openOnlyGifModal(this.dataset.name)" style="display: flex; align-items: center; gap: 10px; min-width: 0; cursor: pointer; flex: 1;" title="Toque para ver animação ampliada com zoom 3D">
                             <span style="font-size: 18px;">${icon}</span>
                             <div style="min-width: 0;">
-                              <div style="font-size: 13.5px; font-weight: 700; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${idx + 1}. ${ex.nome}</div>
+                              <div style="font-size: 13.5px; font-weight: 700; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${idx + 1}. ${escapeHtml(ex.nome)}</div>
                               <div style="font-size: 11px; color: var(--accent-cyan); font-weight: 600; margin-top: 2px;">${ex.series || 3} séries • ${ex.reps || '8-12'} reps • ${ex.descanso || 60}s descanso</div>
                             </div>
                           </div>
-                          <button onclick="event.stopPropagation(); openOnlyGifModal('${safeName}')" style="background: rgba(0,210,255,0.12); border: 1px solid rgba(0,210,255,0.4); color: var(--accent-cyan); font-size: 11px; font-weight: 800; padding: 5px 10px; border-radius: 6px; cursor: pointer; flex-shrink: 0;" title="Ver demonstração animada">
+                          <button data-name="${escapeHtml(ex.nome || 'Exercício')}" onclick="event.stopPropagation(); openOnlyGifModal(this.dataset.name)" style="background: rgba(0,210,255,0.12); border: 1px solid rgba(0,210,255,0.4); color: var(--accent-cyan); font-size: 11px; font-weight: 800; padding: 5px 10px; border-radius: 6px; cursor: pointer; flex-shrink: 0;" title="Ver demonstração animada">
                             🔍 GIF 3D
                           </button>
                         </div>
@@ -9099,21 +9114,21 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
                         <!-- Barra de Ações por Exercício (Subir, Descer, Editar, Substituir, Remover) -->
                         <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 11px;">
                           <div style="display: flex; gap: 4px; align-items: center;">
-                            <button onclick="event.stopPropagation(); reorderWorkoutExercise('${w.id}', ${idx}, -1)" ${idx === 0 ? 'disabled' : ''} class="btn-micro" title="Mover para cima">
+                            <button data-id="${escapeHtml(w.id)}" data-index="${idx}" onclick="event.stopPropagation(); reorderWorkoutExercise(this.dataset.id, parseInt(this.dataset.index), -1)" ${idx === 0 ? 'disabled' : ''} class="btn-micro" title="Mover para cima">
                               ⬆️
                             </button>
-                            <button onclick="event.stopPropagation(); reorderWorkoutExercise('${w.id}', ${idx}, 1)" ${idx === exercises.length - 1 ? 'disabled' : ''} class="btn-micro" title="Mover para baixo">
+                            <button data-id="${escapeHtml(w.id)}" data-index="${idx}" onclick="event.stopPropagation(); reorderWorkoutExercise(this.dataset.id, parseInt(this.dataset.index), 1)" ${idx === exercises.length - 1 ? 'disabled' : ''} class="btn-micro" title="Mover para baixo">
                               ⬇️
                             </button>
                           </div>
                           <div style="display: flex; gap: 6px; align-items: center;">
-                            <button onclick="event.stopPropagation(); editWorkoutExerciseParams('${w.id}', ${idx})" style="background: none; border: none; color: #d0d4dc; cursor: pointer; font-size: 11px; font-weight: 700; padding: 3px 6px;" title="Editar séries, repetições e descanso">
+                            <button data-id="${escapeHtml(w.id)}" data-index="${idx}" onclick="event.stopPropagation(); editWorkoutExerciseParams(this.dataset.id, parseInt(this.dataset.index))" style="background: none; border: none; color: #d0d4dc; cursor: pointer; font-size: 11px; font-weight: 700; padding: 3px 6px;" title="Editar séries, repetições e descanso">
                               ✏️ Editar
                             </button>
-                            <button onclick="event.stopPropagation(); replaceWorkoutExercise('${w.id}', ${idx})" style="background: none; border: none; color: var(--accent-cyan); cursor: pointer; font-size: 11px; font-weight: 700; padding: 3px 6px;" title="Substituir por outro exercício">
+                            <button data-id="${escapeHtml(w.id)}" data-index="${idx}" onclick="event.stopPropagation(); replaceWorkoutExercise(this.dataset.id, parseInt(this.dataset.index))" style="background: none; border: none; color: var(--accent-cyan); cursor: pointer; font-size: 11px; font-weight: 700; padding: 3px 6px;" title="Substituir por outro exercício">
                               🔄 Substituir
                             </button>
-                            <button onclick="event.stopPropagation(); removeWorkoutExercise('${w.id}', ${idx})" style="background: none; border: none; color: var(--error-red); cursor: pointer; font-size: 11px; font-weight: 700; padding: 3px 6px;" title="Remover exercício">
+                            <button data-id="${escapeHtml(w.id)}" data-index="${idx}" onclick="event.stopPropagation(); removeWorkoutExercise(this.dataset.id, parseInt(this.dataset.index))" style="background: none; border: none; color: var(--error-red); cursor: pointer; font-size: 11px; font-weight: 700; padding: 3px 6px;" title="Remover exercício">
                               🗑️ Remover
                             </button>
                           </div>
@@ -9403,7 +9418,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
         const exMuscle = ex.grupoMuscular || ex.grupo_muscular || (typeof getExerciseMuscleGroup === 'function' ? getExerciseMuscleGroup(ex.nome) : 'Geral');
 
         return `
-          <div class="card active-exercise-card" data-ex-index="${exIdx}" data-ex-name="${safeName}" data-ex-id="${ex.id || 'ex_' + exIdx}" data-ex-muscle="${exMuscle}" style="border-left: 4px solid var(--accent-cyan); padding: 14px; margin-bottom: 12px;">
+          <div class="card active-exercise-card" data-ex-index="${exIdx}" data-ex-name="${escapeHtml(ex.nome || 'Exercício')}" data-ex-id="${escapeHtml(ex.id || 'ex_' + exIdx)}" data-ex-muscle="${escapeHtml(exMuscle)}" style="border-left: 4px solid var(--accent-cyan); padding: 14px; margin-bottom: 12px;">
             <div style="margin-bottom: 10px;">
               <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px;">
                 <span style="font-size: 10px; color: var(--primary-blue); font-weight: 800; letter-spacing: 0.5px;">EXERCÍCIO ${exIdx + 1} DE ${exercises.length}</span>
@@ -9413,12 +9428,12 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
                   <span style="font-size: 10px; color: var(--text-grey); font-weight: 700;">⏱ ${restDuration}s</span>
                 </div>
               </div>
-              <h3 style="font-size: 16px; font-weight: 800; margin-top: 2px; color: white;">${ex.nome}</h3>
-              <p style="font-size: 11px; color: var(--text-grey); margin: 0;">${ex.series || 4} séries x ${ex.reps || '10-12'} reps • ${ex.equipamento || 'Livre'}</p>
+              <h3 style="font-size: 16px; font-weight: 800; margin-top: 2px; color: white;">${escapeHtml(ex.nome)}</h3>
+              <p style="font-size: 11px; color: var(--text-grey); margin: 0;">${ex.series || 4} séries x ${ex.reps || '10-12'} reps • ${escapeHtml(ex.equipamento || 'Livre')}</p>
             </div>
 
             <!-- Demonstração Rápida e GIF -->
-            <div class="active-gif-banner-trigger" onclick="openExerciseDetailModal('${safeName}')" style="display: flex; align-items: center; justify-content: space-between; background: rgba(0,210,255,0.06); border: 1px dashed rgba(0,210,255,0.35); padding: 8px 12px; border-radius: 10px; margin-bottom: 12px; cursor: pointer; transition: all 0.2s;" title="Ver demonstração técnica do exercício">
+            <div class="active-gif-banner-trigger" data-ex-name="${escapeHtml(ex.nome || 'Exercício')}" onclick="openExerciseDetailModal(this.dataset.exName)" style="display: flex; align-items: center; justify-content: space-between; background: rgba(0,210,255,0.06); border: 1px dashed rgba(0,210,255,0.35); padding: 8px 12px; border-radius: 10px; margin-bottom: 12px; cursor: pointer; transition: all 0.2s;" title="Ver demonstração técnica do exercício">
               <div style="display: flex; align-items: center; gap: 10px; pointer-events: none;">
                 <div style="width: 38px; height: 38px; background: #000; border-radius: 8px; overflow: hidden; border: 1px solid rgba(0,210,255,0.4); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                   <img src="${gifUrl}" style="width: 100%; height: 100%; object-fit: contain;" onerror="this.src='https://cdn.jsdelivr.net/gh/JahelCuadrado/ExerciseGymGifsDB@v1.1.0/pectorals/barbell-bench-press.gif'">
@@ -9952,7 +9967,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       const prList = document.getElementById('finishedWorkoutPRList');
       if (item.prs_detectados && item.prs_detectados.length > 0) {
         prList.innerHTML = item.prs_detectados.map(pr => `
-          <div><strong>${pr.exercicio}</strong>: ${pr.novoPeso} kg (${pr.pesoAnterior > 0 ? `superou ${pr.pesoAnterior} kg` : 'primeiro registro'})</div>
+          <div><strong>${escapeHtml(pr.exercicio)}</strong>: ${escapeHtml(pr.novoPeso)} kg (${pr.pesoAnterior > 0 ? `superou ${escapeHtml(pr.pesoAnterior)} kg` : 'primeiro registro'})</div>
         `).join('');
         prSection.style.display = 'block';
       } else {
@@ -10526,14 +10541,14 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
                       <span style="font-size: 16px;">${icon}</span>
                       <div style="min-width: 0;">
                         <div style="font-size: 13px; font-weight: 700; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                          ${exIdx + 1}. ${ex.displayName}
+                          ${exIdx + 1}. ${escapeHtml(ex.displayName)}
                         </div>
                         <div style="font-size: 11px; color: var(--accent-cyan); font-weight: 600;">
                           ${ex.sets || 3} séries • ${ex.reps || '8-12'} reps • ${ex.rest || 60}s descanso
                         </div>
                       </div>
                     </div>
-                    <button onclick="event.stopPropagation(); openOnlyGifModal('${safeName}')" style="background: rgba(0,210,255,0.12); border: 1px solid rgba(0,210,255,0.4); color: var(--accent-cyan); font-size: 11px; font-weight: 800; padding: 4px 8px; border-radius: 6px; cursor: pointer; flex-shrink: 0;" title="Ver demonstração animada">
+                    <button data-name="${escapeHtml(ex.displayName || 'Exercício')}" onclick="event.stopPropagation(); openOnlyGifModal(this.dataset.name)" style="background: rgba(0,210,255,0.12); border: 1px solid rgba(0,210,255,0.4); color: var(--accent-cyan); font-size: 11px; font-weight: 800; padding: 4px 8px; border-radius: 6px; cursor: pointer; flex-shrink: 0;" title="Ver demonstração animada">
                       🔍 GIF 3D
                     </button>
                   </div>
@@ -10779,7 +10794,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
             <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
               <span>${icon}</span>
               <div style="min-width: 0;">
-                <div style="font-size: 13px; font-weight: 700; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${idx + 1}. ${ex.nome}</div>
+                <div style="font-size: 13px; font-weight: 700; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${idx + 1}. ${escapeHtml(ex.nome)}</div>
                 <div style="font-size: 11px; color: var(--accent-cyan);">${ex.series} séries • ${ex.reps} reps • ${ex.descanso || 60}s descanso</div>
               </div>
             </div>
@@ -11179,7 +11194,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
           <div class="card" style="border-left: 3px solid var(--accent-cyan); padding: 12px; margin-bottom: 8px;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <div>
-                <h5 style="font-size: 14px; font-weight: 800; color: white; margin: 0;">${s.nomeTreino}</h5>
+                <h5 style="font-size: 14px; font-weight: 800; color: white; margin: 0;">${escapeHtml(s.nomeTreino)}</h5>
                 <p style="font-size: 11px; color: var(--text-grey); margin: 2px 0 0 0;">
                   ⏱ ${s.duracaoMinutos || 1} min ${s.volume_total_kg ? `• ⚡ ${s.volume_total_kg} kg` : ''}
                 </p>
@@ -11226,7 +11241,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
 
       const prevValue = select.value;
       const sortedNames = Array.from(exercisesSet).sort();
-      const options = sortedNames.map(name => `<option value="${name}" ${name === prevValue ? 'selected' : ''}>${name}</option>`);
+      const options = sortedNames.map(name => `<option value="${escapeHtml(name)}" ${name === prevValue ? 'selected' : ''}>${escapeHtml(name)}</option>`);
       select.innerHTML = options.join('');
       if (!select.value && sortedNames.length > 0) {
         select.value = sortedNames[0];
@@ -11577,13 +11592,12 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
         } else {
           const sortedPRs = Array.from(prMap.entries()).sort((a, b) => b[1].weight - a[1].weight);
           prContainer.innerHTML = sortedPRs.map(([name, data]) => {
-            const safeName = name.replace(/'/g, "\\'");
             const est1RMBadge = data.est1RM ? `<span style="font-size: 10.5px; background: rgba(0,210,255,0.12); color: var(--accent-cyan); padding: 2px 7px; border-radius: 6px; font-weight: 800; border: 1px solid rgba(0,210,255,0.25);">1RM est. ~${data.est1RM} kg</span>` : '';
             return `
-              <div class="pr-card-item" data-ex-name="${name}" onclick="openExerciseInEvolutionChart('${safeName}')" style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.03); border: 1px solid var(--divider); border-radius: 12px; padding: 12px 14px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='var(--accent-cyan)'" onmouseout="this.style.borderColor='var(--divider)'">
+              <div class="pr-card-item" data-ex-name="${escapeHtml(name)}" onclick="openExerciseInEvolutionChart(this.dataset.exName)" style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.03); border: 1px solid var(--divider); border-radius: 12px; padding: 12px 14px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='var(--accent-cyan)'" onmouseout="this.style.borderColor='var(--divider)'">
                 <div>
                   <div style="font-size: 13.5px; font-weight: 800; color: white; display: flex; align-items: center; gap: 6px;">
-                    <span>${name}</span>
+                    <span>${escapeHtml(name)}</span>
                     <span style="font-size: 11px; color: var(--accent-cyan);" title="Ver gráfico">📈</span>
                   </div>
                   <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
@@ -11757,7 +11771,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
         } else {
           const email = getEffectiveUserEmail();
           const name = (currentAuthUser && currentAuthUser.user_metadata && currentAuthUser.user_metadata.nome) || (email ? email.split('@')[0] : 'Atleta TitanNova');
-          greetingEl.innerHTML = `Olá, ${name}! 👋`;
+          greetingEl.innerHTML = `Olá, ${escapeHtml(name)}! 👋`;
         }
       }
 
@@ -11903,7 +11917,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       // Se houver um treino ativo em andamento
       if (isWorkoutActive && currentActiveWorkout) {
         const tempoStr = formatSecondsToMMSS(activeWorkoutSeconds);
-        heroTitleEl.innerHTML = `<span style="color: var(--accent-cyan); font-size: 11px; font-weight: 800; display: block; margin-bottom: 2px; letter-spacing: 0.5px;">⚡ TREINO EM ANDAMENTO</span>${currentActiveWorkout.nome}`;
+        heroTitleEl.innerHTML = `<span style="color: var(--accent-cyan); font-size: 11px; font-weight: 800; display: block; margin-bottom: 2px; letter-spacing: 0.5px;">⚡ TREINO EM ANDAMENTO</span>${escapeHtml(currentActiveWorkout.nome)}`;
         if (heroSubtitleEl) {
           heroSubtitleEl.innerText = `Sessão ativa em execução • ${tempoStr} decorridos`;
         }
@@ -12724,8 +12738,8 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
             <div style="display: flex; align-items: center; gap: 12px; background: rgba(0,210,255,0.08); border: 1.5px solid rgba(0,210,255,0.25); border-radius: 14px; padding: 10px 14px; margin-bottom: 6px;">
               ${gif ? `<img src="${gif}" style="width: 46px; height: 46px; border-radius: 10px; object-fit: cover; background: #000; border: 1.5px solid var(--accent-cyan);" />` : `<div style="font-size: 28px;">🏋️‍♂️</div>`}
               <div style="text-align: left; flex: 1; min-width: 0;">
-                <div style="font-size: 13.5px; font-weight: 800; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${name}</div>
-                <div style="font-size: 11px; color: var(--accent-cyan); font-weight: 600; margin-top: 2px;">Grupo Muscular: ${muscle}</div>
+                <div style="font-size: 13.5px; font-weight: 800; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(name)}</div>
+                <div style="font-size: 11px; color: var(--accent-cyan); font-weight: 600; margin-top: 2px;">Grupo Muscular: ${escapeHtml(muscle)}</div>
               </div>
             </div>
           `;
@@ -12741,7 +12755,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       if (selectDropdown) {
         let optionsHtml = '';
         if (Array.isArray(allWorkoutsList) && allWorkoutsList.length > 0) {
-          optionsHtml += allWorkoutsList.map(w => `<option value="${w.id}">Ficha: ${w.nome} (${(w.exercicios || []).length} ex)</option>`).join('');
+          optionsHtml += allWorkoutsList.map(w => `<option value="${escapeHtml(w.id)}">Ficha: ${escapeHtml(w.nome)} (${(w.exercicios || []).length} ex)</option>`).join('');
           optionsHtml += '<option value="__new_workout__">➕ Criar Nova Ficha de Treino...</option>';
         } else {
           optionsHtml = '<option value="__new_workout__">➕ Criar Nova Ficha de Treino</option>';
@@ -13134,33 +13148,33 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
               </div>
 
               <!-- Informações do Exercício -->
-              <div onclick="openExerciseDetailModal('${id}')" style="flex: 1; min-width: 0; cursor: pointer; padding: 1px 0;" title="Toque para ver Detalhes e Execução">
+              <div data-id="${escapeHtml(id)}" onclick="openExerciseDetailModal(this.dataset.id)" style="flex: 1; min-width: 0; cursor: pointer; padding: 1px 0;" title="Toque para ver Detalhes e Execução">
                 <h4 style="font-size: 14.5px; font-weight: 800; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; transition: color 0.2s;" onmouseover="this.style.color='var(--accent-cyan)'" onmouseout="this.style.color='white'">
-                  ${formattedTitle}
+                  ${escapeHtml(formattedTitle)}
                 </h4>
 
                 <!-- Tags / Badges com tradução PT-BR -->
                 <div style="display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 5px;">
-                  <span class="badge-chip badge-cyan">${primaryBodyPart.toUpperCase()}</span>
-                  <span class="badge-chip badge-grey">⚙️ ${capitalizeText(primaryEquip)}</span>
-                  <span class="badge-chip badge-gold">🎯 ${capitalizeText(primaryTarget)}</span>
+                  <span class="badge-chip badge-cyan">${escapeHtml(primaryBodyPart.toUpperCase())}</span>
+                  <span class="badge-chip badge-grey">⚙️ ${escapeHtml(capitalizeText(primaryEquip))}</span>
+                  <span class="badge-chip badge-gold">🎯 ${escapeHtml(capitalizeText(primaryTarget))}</span>
                 </div>
 
                 ${secondary ? `
                   <div style="font-size: 10.5px; color: var(--text-grey); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                    <span style="color: #a0aab8;">Secundários:</span> ${secondary}
+                    <span style="color: #a0aab8;">Secundários:</span> ${escapeHtml(secondary)}
                   </div>
                 ` : ''}
 
                 <div style="display: flex; gap: 8px; margin-top: 6px; align-items: center;">
-                  <span onclick="event.stopPropagation(); toggleCardExpansion('${id}', event)" 
+                  <span data-id="${escapeHtml(id)}" onclick="event.stopPropagation(); toggleCardExpansion(this.dataset.id, event)" 
                         style="font-size: 11px; color: var(--accent-cyan); font-weight: 700; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; background: rgba(0,210,255,0.08); padding: 2px 8px; border-radius: 6px; border: 1px solid rgba(0,210,255,0.25);"
                         onmouseover="this.style.background='rgba(0,210,255,0.2)'"
                         onmouseout="this.style.background='rgba(0,210,255,0.08)'"
                         title="Expandir animação do GIF">
                     ${isExpanded ? '▲ Recolher GIF' : '▼ Ver GIF 3D'}
                   </span>
-                  <button onclick="event.stopPropagation(); toggleFavoriteExercise('${id}', this)" style="background: none; border: none; font-size: 18px; cursor: pointer; padding: 0 4px;" title="Favoritar exercício">
+                  <button data-id="${escapeHtml(id)}" onclick="event.stopPropagation(); toggleFavoriteExercise(this.dataset.id, this)" style="background: none; border: none; font-size: 18px; cursor: pointer; padding: 0 4px;" title="Favoritar exercício">
                     ${isFav ? '⭐' : '☆'}
                   </button>
                 </div>
@@ -13175,7 +13189,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
                 <!-- Visor Ampliado do GIF com loading lazy e referrerpolicy -->
                 <div style="width: 100%; height: 260px; background: #000; border-radius: 14px; overflow: hidden; display: flex; align-items: center; justify-content: center; border: 1.5px solid rgba(0,210,255,0.4); position: relative; box-shadow: 0 6px 20px rgba(0,0,0,0.8);">
                   ${gif ? `
-                    <img src="${gif}" alt="Demonstração de ${originalName}" loading="lazy" referrerpolicy="no-referrer" style="width: 100%; height: 100%; object-fit: contain; display: block;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                    <img src="${gif}" alt="Demonstração de ${escapeHtml(originalName)}" loading="lazy" referrerpolicy="no-referrer" style="width: 100%; height: 100%; object-fit: contain; display: block;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                   ` : ''}
                   <div style="display: ${gif ? 'none' : 'flex'}; flex-direction: column; align-items: center; justify-content: center; padding: 20px; color: var(--text-grey);">
                     <div style="font-size: 40px; margin-bottom: 6px;">🏋️‍♂️</div>
@@ -13189,10 +13203,10 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
 
                 <!-- Botões de Ação Dentro do Card Expandido -->
                 <div style="display: flex; gap: 8px; margin-top: 10px;">
-                  <button onclick="openOnlyGifModal('${id}')" class="btn btn-outline" style="flex: 1; padding: 8px; font-size: 11.5px; border-color: var(--accent-cyan); color: var(--accent-cyan); font-weight: 700;">
+                  <button data-id="${escapeHtml(id)}" onclick="openOnlyGifModal(this.dataset.id)" class="btn btn-outline" style="flex: 1; padding: 8px; font-size: 11.5px; border-color: var(--accent-cyan); color: var(--accent-cyan); font-weight: 700;">
                     🔍 Pop-up Zoom 3D
                   </button>
-                  <button onclick="openExerciseDetailModal('${id}')" class="btn btn-primary" style="flex: 1.2; padding: 8px; font-size: 11.5px; font-weight: 800;">
+                  <button data-id="${escapeHtml(id)}" onclick="openExerciseDetailModal(this.dataset.id)" class="btn btn-primary" style="flex: 1.2; padding: 8px; font-size: 11.5px; font-weight: 800;">
                     📖 Instruções Passo a Passo
                   </button>
                 </div>
@@ -13466,7 +13480,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       const fallbackEl = document.getElementById('detailFallbackIcon');
 
       if (titleEl) {
-        titleEl.innerHTML = `${exerciseName} ${origName && origName.toLowerCase() !== exerciseName.toLowerCase() ? `<div style="font-size: 11.5px; color: var(--text-grey); font-weight: 600; margin-top: 2px;">Original: ${origName}</div>` : ''}`;
+        titleEl.innerHTML = `${escapeHtml(exerciseName)} ${origName && origName.toLowerCase() !== exerciseName.toLowerCase() ? `<div style="font-size: 11.5px; color: var(--text-grey); font-weight: 600; margin-top: 2px;">Original: ${escapeHtml(origName)}</div>` : ''}`;
       }
       if (badgeEl) badgeEl.innerText = capitalizeText(muscleGroup);
       if (equipBadgeEl) equipBadgeEl.innerText = capitalizeText(equip);
@@ -14278,24 +14292,24 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
                       🏃
                     </div>
                     <div>
-                      <h4 style="font-size: 14px; font-weight: 800; color: white; margin: 0;">${name}</h4>
-                      <div style="font-size: 11px; color: var(--text-grey);">${ath.email || ''}</div>
+                      <h4 style="font-size: 14px; font-weight: 800; color: white; margin: 0;">${escapeHtml(name)}</h4>
+                      <div style="font-size: 11px; color: var(--text-grey);">${escapeHtml(ath.email || '')}</div>
                     </div>
                   </div>
                   <span style="font-size: 10px; font-weight: 800; background: rgba(76,175,80,0.18); color: var(--success-green); padding: 2px 8px; border-radius: 8px;">Ativo</span>
                 </div>
 
                 <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; font-size: 11px;">
-                  <span style="background: #222630; padding: 2px 8px; border-radius: 6px; color: #b0c4de;">🎯 ${goal}</span>
-                  <span style="background: #222630; padding: 2px 8px; border-radius: 6px; color: #b0c4de;">⚡ ${exp}</span>
-                  ${ath.phone ? `<a href="https://wa.me/55${ath.phone.replace(/\\D/g,'')}" target="_blank" style="background: rgba(37,211,102,0.15); color: #25D366; text-decoration: none; padding: 2px 8px; border-radius: 6px; font-weight: 700;">💬 WhatsApp</a>` : ''}
+                  <span style="background: #222630; padding: 2px 8px; border-radius: 6px; color: #b0c4de;">🎯 ${escapeHtml(goal)}</span>
+                  <span style="background: #222630; padding: 2px 8px; border-radius: 6px; color: #b0c4de;">⚡ ${escapeHtml(exp)}</span>
+                  ${ath.phone ? `<a href="https://wa.me/55${encodeURIComponent(ath.phone.replace(/\\D/g,''))}" target="_blank" style="background: rgba(37,211,102,0.15); color: #25D366; text-decoration: none; padding: 2px 8px; border-radius: 6px; font-weight: 700;">💬 WhatsApp</a>` : ''}
                 </div>
 
                 <div style="display: flex; gap: 8px;">
-                  <button onclick="openAssignWorkoutModal('${rel.athlete_id}', '${name.replace(/'/g, "\\'")}')" class="btn btn-primary" style="flex: 2; padding: 8px 10px; font-size: 11.5px; font-weight: 800;">
+                  <button data-athlete-id="${escapeHtml(rel.athlete_id)}" data-athlete-name="${escapeHtml(name)}" onclick="openAssignWorkoutModal(this.dataset.athleteId, this.dataset.athleteName)" class="btn btn-primary" style="flex: 2; padding: 8px 10px; font-size: 11.5px; font-weight: 800;">
                     📋 Prescrever Treino
                   </button>
-                  <button onclick="TrainerModule.removeStudent('${rel.athlete_id}', '${name.replace(/'/g, "\\'")}')" class="btn btn-outline" style="flex: 1; padding: 8px 10px; font-size: 11px; border-color: rgba(255,82,82,0.4); color: #ff5252;">
+                  <button data-athlete-id="${escapeHtml(rel.athlete_id)}" data-athlete-name="${escapeHtml(name)}" onclick="TrainerModule.removeStudent(this.dataset.athleteId, this.dataset.athleteName)" class="btn btn-outline" style="flex: 1; padding: 8px 10px; font-size: 11px; border-color: rgba(255,82,82,0.4); color: #ff5252;">
                     Desvincular
                   </button>
                 </div>
@@ -14324,14 +14338,14 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
             return `
               <div class="card" style="background: #161a24; border-left: 4px solid #ffd700; padding: 14px; margin: 0;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                  <h4 style="font-size: 14px; font-weight: 800; color: white; margin: 0;">${targetName}</h4>
+                  <h4 style="font-size: 14px; font-weight: 800; color: white; margin: 0;">${escapeHtml(targetName)}</h4>
                   <span style="font-size: 10px; font-weight: 800; background: rgba(255,215,0,0.18); color: #ffd700; padding: 2px 8px; border-radius: 8px;">Pendente</span>
                 </div>
                 <div style="font-size: 11px; color: var(--text-grey); margin-bottom: 10px;">
                   Expira em: <strong>${expDate}</strong> &bull; Usos: ${inv.used_count}/${inv.max_uses}
                 </div>
                 <div style="display: flex; gap: 8px;">
-                  <button onclick="openTrainerInviteModal('${targetName.replace(/'/g, "\\'")}')" class="btn btn-outline" style="flex: 1; padding: 8px; font-size: 11px; border-color: var(--accent-cyan); color: var(--accent-cyan); font-weight: 700;">
+                  <button data-target-name="${escapeHtml(targetName)}" onclick="openTrainerInviteModal(this.dataset.targetName)" class="btn btn-outline" style="flex: 1; padding: 8px; font-size: 11px; border-color: var(--accent-cyan); color: var(--accent-cyan); font-weight: 700;">
                     📲 Reenviar WhatsApp
                   </button>
                 </div>
@@ -14356,8 +14370,8 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
             return `
               <div class="card" style="background: #161a24; padding: 12px; margin: 0; opacity: 0.8;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <span style="font-size: 13px; font-weight: 700; color: white;">${name}</span>
-                  <span style="font-size: 10px; color: var(--text-grey); text-transform: uppercase;">${rel.status}</span>
+                  <span style="font-size: 13px; font-weight: 700; color: white;">${escapeHtml(name)}</span>
+                  <span style="font-size: 10px; color: var(--text-grey); text-transform: uppercase;">${escapeHtml(rel.status)}</span>
                 </div>
               </div>
             `;
@@ -14567,14 +14581,14 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
         studentSelect.innerHTML = activeList.map(s => {
           const name = s.athlete?.nome || s.athlete?.email || 'Aluno';
           const selected = (s.athlete_id === athleteId) ? 'selected' : '';
-          return `<option value="${s.athlete_id}" ${selected}>${name}</option>`;
+          return `<option value="${escapeHtml(s.athlete_id)}" ${selected}>${escapeHtml(name)}</option>`;
         }).join('');
       }
 
       // Preencher treinos do personal
       if (workoutSelect) {
         workoutSelect.innerHTML = (allWorkoutsList || []).map(w => {
-          return `<option value="${w.id}">${w.nome} (${(w.exercicios || []).length} exercícios)</option>`;
+          return `<option value="${escapeHtml(w.id)}">${escapeHtml(w.nome)} (${(w.exercicios || []).length} exercícios)</option>`;
         }).join('');
       }
 
@@ -14757,11 +14771,11 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
               ${assignments.map(a => `
                 <div style="background: #222630; border-radius: 8px; padding: 10px; display: flex; justify-content: space-between; align-items: center;">
                   <div>
-                    <div style="font-size: 12.5px; font-weight: 800; color: white;">${a.workout_title}</div>
-                    <div style="font-size: 10.5px; color: var(--text-grey);">${a.trainer_notes || 'Sem observações'}</div>
+                    <div style="font-size: 12.5px; font-weight: 800; color: white;">${escapeHtml(a.workout_title)}</div>
+                    <div style="font-size: 10.5px; color: var(--text-grey);">${escapeHtml(a.trainer_notes || 'Sem observações')}</div>
                   </div>
                   <div style="display: flex; gap: 6px;">
-                    <button onclick="AthleteTrainerModule.openComments('${a.id}')" class="btn btn-outline" style="padding: 5px 8px; font-size: 10.5px; border-color: var(--accent-cyan); color: var(--accent-cyan);">
+                    <button data-id="${escapeHtml(a.id)}" onclick="AthleteTrainerModule.openComments(this.dataset.id)" class="btn btn-outline" style="padding: 5px 8px; font-size: 10.5px; border-color: var(--accent-cyan); color: var(--accent-cyan);">
                       💬 Feedback
                     </button>
                   </div>
@@ -14822,7 +14836,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
                 <div style="display: flex; justify-content: ${isMine ? 'flex-end' : 'flex-start'}; margin-bottom: 6px;">
                   <div style="background: ${isMine ? 'var(--primary-blue)' : '#222630'}; color: white; padding: 8px 12px; border-radius: 12px; max-width: 80%; font-size: 12px; line-height: 1.35;">
                     <div style="font-size: 9.5px; opacity: 0.8; margin-bottom: 2px;">${c.author_role === 'trainer' ? '💪 Personal' : '🏃 Atleta'}</div>
-                    ${c.comment_text}
+                    ${escapeHtml(c.comment_text)}
                   </div>
                 </div>
               `;
@@ -15197,7 +15211,6 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
 
       container.innerHTML = filtered.map(ex => {
         const name = ex.nome || ex.name || 'Exercício';
-        const safeName = name.replace(/'/g, "\\'");
         const muscle = ex.grupoMuscular || (ex.bodyParts && ex.bodyParts[0]) || 'Geral';
         const gif = ex.gifUrl || ex.gif_url || '';
         return `
@@ -15207,11 +15220,11 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
                 <img src="${gif || 'assets/icons/logo.png'}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='assets/icons/logo.png'">
               </div>
               <div style="min-width: 0;">
-                <h5 style="font-size: 13px; font-weight: 700; color: white; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${name}</h5>
-                <span style="font-size: 10.5px; color: var(--accent-cyan); font-weight: 600;">${muscle}</span>
+                <h5 style="font-size: 13px; font-weight: 700; color: white; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(name)}</h5>
+                <span style="font-size: 10.5px; color: var(--accent-cyan); font-weight: 600;">${escapeHtml(muscle)}</span>
               </div>
             </div>
-            <button type="button" onclick="confirmReplaceActiveExercise('${safeName}', '${muscle}', '${gif}')" class="btn btn-primary" style="width: auto; padding: 6px 12px; font-size: 11px; font-weight: 800; white-space: nowrap; margin-left: 8px;">
+            <button type="button" data-name="${escapeHtml(name)}" data-muscle="${escapeHtml(muscle)}" data-gif="${escapeHtml(gif)}" onclick="confirmReplaceActiveExercise(this.dataset.name, this.dataset.muscle, this.dataset.gif)" class="btn btn-primary" style="width: auto; padding: 6px 12px; font-size: 11px; font-weight: 800; white-space: nowrap; margin-left: 8px;">
               Selecionar
             </button>
           </div>
@@ -15667,22 +15680,22 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
               <div class="card" style="background: #161a24; padding: 14px; margin: 0; border-left: 4px solid ${statusColor};">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
                   <div>
-                    <h4 style="font-size: 14px; font-weight: 800; color: white; margin: 0;">${t.professional_name || prof.nome || 'Sem Nome'}</h4>
-                    <div style="font-size: 11px; color: var(--text-grey);">${prof.email || ''} &bull; ${t.city || ''}/${t.state || ''}</div>
+                    <h4 style="font-size: 14px; font-weight: 800; color: white; margin: 0;">${escapeHtml(t.professional_name || prof.nome || 'Sem Nome')}</h4>
+                    <div style="font-size: 11px; color: var(--text-grey);">${escapeHtml(prof.email || '')} &bull; ${escapeHtml(t.city || '')}/${escapeHtml(t.state || '')}</div>
                   </div>
-                  <span style="font-size: 10px; font-weight: 800; background: rgba(255,255,255,0.08); color: ${statusColor}; padding: 2px 8px; border-radius: 8px; text-transform: uppercase;">${st}</span>
+                  <span style="font-size: 10px; font-weight: 800; background: rgba(255,255,255,0.08); color: ${statusColor}; padding: 2px 8px; border-radius: 8px; text-transform: uppercase;">${escapeHtml(st)}</span>
                 </div>
 
                 <div style="background: #0c0e14; padding: 8px 12px; border-radius: 8px; font-size: 12px; color: white; margin-bottom: 10px;">
-                  📜 CREF: <strong>${t.cref_number}</strong> / ${t.cref_state}
-                  ${t.phone ? ` &bull; Tel: ${t.phone}` : ''}
+                  📜 CREF: <strong>${escapeHtml(t.cref_number)}</strong> / ${escapeHtml(t.cref_state)}
+                  ${t.phone ? ` &bull; Tel: ${escapeHtml(t.phone)}` : ''}
                 </div>
 
                 <div style="display: flex; gap: 8px;">
-                  <button onclick="AdminTrainersModule.verifyCref('${t.user_id}', true)" class="btn btn-success" style="flex: 1; padding: 7px; font-size: 11px; font-weight: 800;">
+                  <button data-userid="${escapeHtml(t.user_id)}" onclick="AdminTrainersModule.verifyCref(this.dataset.userid, true)" class="btn btn-success" style="flex: 1; padding: 7px; font-size: 11px; font-weight: 800;">
                     ✅ Homologar CREF
                   </button>
-                  <button onclick="AdminTrainersModule.verifyCref('${t.user_id}', false)" class="btn btn-outline" style="flex: 1; padding: 7px; font-size: 11px; border-color: rgba(255,82,82,0.4); color: #ff5252;">
+                  <button data-userid="${escapeHtml(t.user_id)}" onclick="AdminTrainersModule.verifyCref(this.dataset.userid, false)" class="btn btn-outline" style="flex: 1; padding: 7px; font-size: 11px; border-color: rgba(255,82,82,0.4); color: #ff5252;">
                     ❌ Recusar
                   </button>
                 </div>
