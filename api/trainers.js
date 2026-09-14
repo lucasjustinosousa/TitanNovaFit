@@ -35,6 +35,26 @@ export default async function handler(req, res) {
   const token = extractBearerToken(req);
   const action = (req.query && req.query.action) || (req.body && req.body.action);
 
+  // Helper para verificar se o Personal está homologado com CREF aprovado
+  const verifyTrainerApproved = async (userId) => {
+    const isAdm = await verifyIsAdmin(userId, SUPABASE_URL, SERVICE_ROLE_KEY);
+    if (isAdm) return true;
+
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/trainer_profiles?user_id=eq.${encodeURIComponent(userId)}&select=verification_status`, {
+        headers: {
+          apikey: SERVICE_ROLE_KEY,
+          Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+        },
+      });
+      if (!res.ok) return false;
+      const rows = await res.json();
+      return Array.isArray(rows) && rows.length > 0 && rows[0].verification_status === "approved";
+    } catch {
+      return false;
+    }
+  };
+
   // ==============================================================================
   // AÇÃO PÚBLICA / SEM LOGIN OBRIGATÓRIO: CONSULTAR DETALHES DO CONVITE
   // ==============================================================================
@@ -232,6 +252,14 @@ export default async function handler(req, res) {
 
     // 1. CRIAR CONVITE DE ALUNO
     if (action === "create-invite") {
+      const isApproved = await verifyTrainerApproved(user.id);
+      if (!isApproved) {
+        return sendResponse(403, {
+          success: false,
+          error: "Seu cadastro profissional está em análise. Os recursos de prescrição serão liberados após a homologação."
+        });
+      }
+
       const athleteEmail = body.athleteEmail || null;
       const expiresDays = parseInt(body.expiresDays, 10) || 7;
 
@@ -327,6 +355,14 @@ export default async function handler(req, res) {
 
     // 4. ATRIBUIR TREINO AO ALUNO
     if (action === "assign-workout") {
+      const isApproved = await verifyTrainerApproved(user.id);
+      if (!isApproved) {
+        return sendResponse(403, {
+          success: false,
+          error: "Seu cadastro profissional está em análise. Os recursos de prescrição serão liberados após a homologação."
+        });
+      }
+
       const athleteId = body.athleteId;
       const workoutId = body.workoutId;
       const workoutData = body.workoutData;

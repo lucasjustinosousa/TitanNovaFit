@@ -943,6 +943,182 @@ $$;
 REVOKE ALL ON FUNCTION public.get_my_entitlements(UUID) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_my_entitlements(UUID) TO authenticated;
 
+-- 10.3. create_trainer_invite — Exige CREF aprovado, role trainer/admin e conta ativa
+CREATE OR REPLACE FUNCTION public.create_trainer_invite(
+    p_athlete_email TEXT DEFAULT NULL,
+    p_expires_days INT DEFAULT 7
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth
+AS $$
+DECLARE
+    v_trainer_id UUID;
+    v_verification TEXT;
+    v_student_limit INT;
+    v_active_students INT;
+    v_raw_token TEXT;
+    v_token_hash TEXT;
+    v_expires_at TIMESTAMPTZ;
+    v_invite_id UUID;
+    v_is_suspended BOOLEAN := false;
+BEGIN
+    v_trainer_id := auth.uid();
+    IF v_trainer_id IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Não autenticado');
+    END IF;
+
+    -- 1. Verificar suspensão
+    SELECT EXISTS (
+        SELECT 1 FROM public.user_roles 
+        WHERE user_id = v_trainer_id AND active = false
+    ) INTO v_is_suspended;
+
+    IF v_is_suspended THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Sua conta está suspensa. Entre em contato com o suporte.');
+    END IF;
+
+    -- 2. Verificar aprovação de CREF (Apenas personais com status 'approved' ou administradores podem convidar)
+    IF NOT public.is_admin() THEN
+        SELECT verification_status INTO v_verification 
+        FROM public.trainer_profiles 
+        WHERE user_id = v_trainer_id;
+
+        IF v_verification IS NULL OR v_verification <> 'approved' THEN
+            RETURN jsonb_build_object(
+                'success', false, 
+                'error', 'Seu cadastro profissional está em análise. Os recursos de prescrição serão liberados após a homologação.'
+            );
+        END IF;
+    END IF;
+
+    -- 3. Validar limite de alunos do plano
+    v_student_limit := public.get_trainer_student_limit(v_trainer_id);
+    SELECT COUNT(*) INTO v_active_students 
+    FROM public.trainer_athletes 
+    WHERE trainer_id = v_trainer_id AND status = 'active';
+
+    IF v_active_students >= v_student_limit THEN
+        RETURN jsonb_build_object(
+            'success', false, 
+            'error', format('Limite de alunos atingido (%s/%s). Faça upgrade de plano para adicionar mais alunos.', v_active_students, v_student_limit)
+        );
+    END IF;
+
+    -- 4. Gerar token criptográfico seguro
+    v_raw_token := encode(gen_random_bytes(16), 'hex');
+    v_token_hash := encode(digest(v_raw_token, 'sha256'), 'hex');
+    v_expires_at := now() + (COALESCE(p_expires_days, 7) || ' days')::interval;
+
+    INSERT INTO public.trainer_invites (
+        trainer_id,
+        athlete_email,
+        token_hash,
+        status,
+        expires_at
+    )
+    VALUES (
+        v_trainer_id,
+        NULLIF(TRIM(p_athlete_email), ''),
+        v_token_hash,
+        'pending',
+        v_expires_at
+    )
+    RETURNING id INTO v_invite_id;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'invite_token', v_raw_token,
+        'expires_at', v_expires_at
+    );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.create_trainer_invite(TEXT, INT) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.create_trainer_invite(TEXT, INT) TO authenticated;
+
+-- 10.4. assign_workout_to_athlete — Exige CREF aprovado e vínculo ativo
+CREATE OR REPLACE FUNCTION public.assign_workout_to_athlete(
+    p_athlete_id UUID,
+    p_workout_id TEXT,
+    p_workout_data JSONB,
+    p_trainer_notes TEXT DEFAULT NULL,
+    p_starts_at TIMESTAMPTZ DEFAULT now(),
+    p_ends_at TIMESTAMPTZ DEFAULT NULL
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth
+AS $$
+DECLARE
+    v_trainer_id UUID;
+    v_verification TEXT;
+    v_assignment_id UUID;
+BEGIN
+    v_trainer_id := auth.uid();
+    IF v_trainer_id IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Não autenticado');
+    END IF;
+
+    -- 1. Verificar aprovação de CREF
+    IF NOT public.is_admin() THEN
+        SELECT verification_status INTO v_verification 
+        FROM public.trainer_profiles 
+        WHERE user_id = v_trainer_id;
+
+        IF v_verification IS NULL OR v_verification <> 'approved' THEN
+            RETURN jsonb_build_object(
+                'success', false, 
+                'error', 'Seu cadastro profissional está em análise. Os recursos de prescrição serão liberados após a homologação.'
+            );
+        END IF;
+    END IF;
+
+    -- 2. Validar vínculo ativo entre o personal e o atleta
+    IF NOT EXISTS (
+        SELECT 1 FROM public.trainer_athletes 
+        WHERE trainer_id = v_trainer_id AND athlete_id = p_athlete_id AND status = 'active'
+    ) AND NOT public.is_admin() THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Você não possui vínculo ativo com este atleta.');
+    END IF;
+
+    INSERT INTO public.workout_assignments (
+        trainer_id,
+        athlete_id,
+        workout_id,
+        workout_data,
+        status,
+        starts_at,
+        ends_at,
+        trainer_notes,
+        assigned_at
+    )
+    VALUES (
+        v_trainer_id,
+        p_athlete_id,
+        p_workout_id,
+        p_workout_data,
+        'sent',
+        COALESCE(p_starts_at, now()),
+        p_ends_at,
+        p_trainer_notes,
+        now()
+    )
+    RETURNING id INTO v_assignment_id;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'assignment_id', v_assignment_id,
+        'message', 'Treino prescrito e atribuído ao atleta com sucesso!'
+    );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.assign_workout_to_athlete(UUID, TEXT, JSONB, TEXT, TIMESTAMPTZ, TIMESTAMPTZ) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.assign_workout_to_athlete(UUID, TEXT, JSONB, TEXT, TIMESTAMPTZ, TIMESTAMPTZ) TO authenticated;
+
 -- ------------------------------------------------------------------------------
 -- SEÇÃO 11: CONSULTAS DE VERIFICAÇÃO SOMENTE LEITURA
 -- (Execute para auditar a segurança final do banco)

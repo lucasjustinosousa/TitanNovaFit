@@ -14406,6 +14406,13 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
 
     // Controle do Modal de Convite de Alunos
     function openTrainerInviteModal(prefillName = '') {
+      const isApproved = (currentUserProfile?.account_type === 'admin') || (currentTrainerProfile && currentTrainerProfile.verification_status === 'approved');
+      if (!isApproved) {
+        showToastNotification('⚠️ Seu cadastro profissional está em análise. Os recursos de prescrição serão liberados após a homologação.');
+        alert('Seu cadastro profissional está em análise. Os recursos de prescrição serão liberados após a homologação.');
+        return;
+      }
+
       const modal = document.getElementById('modalTrainerInvite');
       const nameInput = document.getElementById('inviteStudentNameInput');
       const resultBox = document.getElementById('generatedInviteResult');
@@ -14426,6 +14433,13 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
     }
 
     async function generateTrainerInvite() {
+      const isApproved = (currentUserProfile?.account_type === 'admin') || (currentTrainerProfile && currentTrainerProfile.verification_status === 'approved');
+      if (!isApproved) {
+        showToastNotification('⚠️ Seu cadastro profissional está em análise. Os recursos de prescrição serão liberados após a homologação.');
+        alert('Seu cadastro profissional está em análise. Os recursos de prescrição serão liberados após a homologação.');
+        return;
+      }
+
       const nameInput = document.getElementById('inviteStudentNameInput');
       const expSelect = document.getElementById('inviteExpirationSelect');
       const genBtn = document.getElementById('btnGenerateInvite');
@@ -14533,6 +14547,13 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
 
     // Modal de Prescrição / Atribuição de Ficha
     function openAssignWorkoutModal(athleteId = '', athleteName = '') {
+      const isApproved = (currentUserProfile?.account_type === 'admin') || (currentTrainerProfile && currentTrainerProfile.verification_status === 'approved');
+      if (!isApproved) {
+        showToastNotification('⚠️ Seu cadastro profissional está em análise. Os recursos de prescrição serão liberados após a homologação.');
+        alert('Seu cadastro profissional está em análise. Os recursos de prescrição serão liberados após a homologação.');
+        return;
+      }
+
       const modal = document.getElementById('modalAssignWorkout');
       const studentSelect = document.getElementById('assignTargetStudentSelect');
       const workoutSelect = document.getElementById('assignTargetWorkoutSelect');
