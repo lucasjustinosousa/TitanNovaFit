@@ -1,24 +1,31 @@
-const CACHE_NAME = 'titannova-fit-v4.0.0';
+const CACHE_NAME = 'titannova-fit-v4.1.0-secure';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './app.html',
   './planos.html',
   './manifest.json',
-  './sw.js',
   './exercises_seed.js',
   './exercises_seed.json',
-  './BUILD_GUIDE.md',
   'https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap'
 ];
 
-// Instalação do Service Worker e Caching dos Recursos Estáticos
+// Instalação do Service Worker e Caching Resiliente dos Recursos Estáticos
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('[ServiceWorker] Pré-cache de arquivos estáticos concluído.');
-      return cache.addAll(ASSETS_TO_CACHE);
+    caches.open(CACHE_NAME).then(async (cache) => {
+      console.log('[ServiceWorker] Pré-caching resiliente de arquivos estáticos...');
+      await Promise.allSettled(
+        ASSETS_TO_CACHE.map(async (url) => {
+          try {
+            await cache.add(url);
+          } catch (err) {
+            console.warn('[ServiceWorker] Aviso não impeditivo ao cachear:', url, err);
+          }
+        })
+      );
+      console.log('[ServiceWorker] Instalação e pré-cache concluídos.');
     })
   );
 });
@@ -39,20 +46,42 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Intercepção de Requisições: Network-First para HTML/Navegação e Stale-While-Revalidate para Assets
+// Intercepção de Requisições:
+// 1. BYPASS TOTAL: APIs e endpoints autenticados (/api/*, *.supabase.co, headers Authorization/apikey)
+// 2. Network-First para HTML/Navegação (garante app sempre atualizado, com fallback offline)
+// 3. Stale-While-Revalidate estritamente para recursos estáticos públicos
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET' || !event.request.url.startsWith('http')) {
     return;
   }
 
+  let url;
+  try {
+    url = new URL(event.request.url);
+  } catch (_) {
+    return;
+  }
+
+  // REGRA CRÍTICA DE SEGURANÇA:
+  // Nunca armazenar em cache nem interceptar dados dinâmicos de usuários ou chamadas de API
+  const isApiOrSupabase = url.pathname.startsWith('/api/') || 
+                          url.hostname.includes('supabase.co') ||
+                          event.request.headers.has('authorization') ||
+                          event.request.headers.has('apikey');
+
+  if (isApiOrSupabase) {
+    // Pass-through direto pela rede
+    return;
+  }
+
   const isHtmlRequest = event.request.mode === 'navigate' || 
                         (event.request.headers.get('accept') && event.request.headers.get('accept').includes('text/html')) ||
-                        event.request.url.endsWith('index.html') ||
-                        event.request.url.endsWith('app.html') ||
-                        event.request.url.endsWith('planos.html') ||
-                        event.request.url.includes('/app') ||
-                        event.request.url.includes('/planos') ||
-                        event.request.url.endsWith('/');
+                        url.pathname.endsWith('index.html') ||
+                        url.pathname.endsWith('app.html') ||
+                        url.pathname.endsWith('planos.html') ||
+                        url.pathname === '/' ||
+                        url.pathname.endsWith('/app') ||
+                        url.pathname.endsWith('/planos');
 
   if (isHtmlRequest) {
     // Network-First para HTML: sempre busca a versão mais recente da rede, fallback para cache offline
@@ -67,7 +96,7 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() => {
           console.log('[ServiceWorker] Offline - Servindo HTML do cache');
-          const isAppPath = event.request.url.includes('/app') || event.request.url.includes('app.html');
+          const isAppPath = url.pathname.includes('/app') || url.pathname.includes('app.html');
           const targetFallback = isAppPath ? './app.html' : './index.html';
           return caches.match(targetFallback).then((cached) => cached || caches.match(event.request) || caches.match('./index.html'));
         })
@@ -75,7 +104,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Stale-While-Revalidate para outros recursos (fontes, scripts, imagens)
+  // Stale-While-Revalidate estritamente para recursos estáticos públicos
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       const fetchPromise = fetch(event.request).then((networkResponse) => {
