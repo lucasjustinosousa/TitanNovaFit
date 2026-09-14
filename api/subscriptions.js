@@ -1,4 +1,5 @@
 import { getSupabaseServerConfig, createCorsHeaders } from "./_config.js";
+import { extractBearerToken, validateUserToken, verifyIsAdmin, checkRateLimit, sendStandardResponse } from "./_auth.js";
 
 export default async function handler(req, res) {
   const origin = req.headers?.origin || "*";
@@ -14,13 +15,7 @@ export default async function handler(req, res) {
   }
 
   const sendResponse = (statusCode, data) => {
-    if (res && typeof res.status === "function") {
-      return res.status(statusCode).json(data);
-    }
-    return new Response(JSON.stringify(data), {
-      status: statusCode,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return sendStandardResponse(res, statusCode, data, corsHeaders);
   };
 
   const config = getSupabaseServerConfig();
@@ -29,57 +24,25 @@ export default async function handler(req, res) {
   }
   const { supabaseUrl: SUPABASE_URL, serviceRoleKey: SERVICE_ROLE_KEY } = config;
 
-  // 1. Extrair token de autorização Bearer
-  const authHeader = req.headers?.authorization || req.headers?.Authorization;
-  const token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.substring(7) : null;
+  // Rate Limiting defensivo
+  const clientIp = req.headers?.['x-forwarded-for'] || req.socket?.remoteAddress || 'sub-client';
+  if (!checkRateLimit(`sub:${clientIp}`, 60, 60000)) {
+    return sendResponse(429, { error: "Muitas requisições. Tente novamente mais tarde." });
+  }
 
-  // Helper para validar usuário pelo token Supabase
-  const getAuthUser = async (userToken) => {
-    if (!userToken) return null;
-    try {
-      const response = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-        headers: {
-          apikey: SERVICE_ROLE_KEY,
-          Authorization: `Bearer ${userToken}`,
-        },
-      });
-      if (!response.ok) return null;
-      return await response.json();
-    } catch {
-      return null;
-    }
-  };
+  // 1. Extrair e validar token de autorização Bearer
+  const token = extractBearerToken(req);
+  if (!token) {
+    return sendResponse(401, { error: "Token de autenticação não fornecido." });
+  }
 
-  // Helper para verificar se usuário é Administrador exclusivamente via banco
-  const verifyIsAdmin = async (userId) => {
-    if (!userId) return false;
-    try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${encodeURIComponent(userId)}&role=eq.admin&active=eq.true&select=id`, {
-        headers: {
-          apikey: SERVICE_ROLE_KEY,
-          Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
-        },
-      });
-      if (!response.ok) return false;
-      const data = await response.json();
-      if (Array.isArray(data) && data.length > 0) return true;
+  const user = await validateUserToken(token, SUPABASE_URL, SERVICE_ROLE_KEY);
+  if (!user || !user.id) {
+    return sendResponse(401, { error: "Sessão inválida ou expirada." });
+  }
 
-      // Fallback para admin_users legado
-      const legacyResp = await fetch(`${SUPABASE_URL}/rest/v1/admin_users?user_id=eq.${encodeURIComponent(userId)}&select=user_id`, {
-        headers: {
-          apikey: SERVICE_ROLE_KEY,
-          Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
-        },
-      });
-      if (legacyResp.ok) {
-        const leg = await legacyResp.json();
-        return Array.isArray(leg) && leg.length > 0;
-      }
-      return false;
-    } catch {
-      return false;
-    }
-  };
+  // Verificar se o usuário é Administrador exclusivamente via banco
+  const isAdmin = await verifyIsAdmin(user.id, SUPABASE_URL, SERVICE_ROLE_KEY);
 
   // Registrar log de auditoria
   const logAudit = async (adminId, action, targetType, targetId, prevData, newData) => {

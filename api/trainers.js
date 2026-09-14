@@ -1,4 +1,5 @@
 import { getSupabaseServerConfig, createCorsHeaders } from "./_config.js";
+import { extractBearerToken, validateUserToken, verifyIsAdmin, checkRateLimit, sendStandardResponse } from "./_auth.js";
 
 export default async function handler(req, res) {
   const origin = req.headers?.origin || "*";
@@ -16,13 +17,7 @@ export default async function handler(req, res) {
   }
 
   const sendResponse = (status, data) => {
-    if (res && typeof res.status === "function") {
-      return res.status(status).json(data);
-    }
-    return new Response(JSON.stringify(data), {
-      status,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return sendStandardResponse(res, status, data, corsHeaders);
   };
 
   const config = getSupabaseServerConfig();
@@ -31,44 +26,13 @@ export default async function handler(req, res) {
   }
   const { supabaseUrl: SUPABASE_URL, serviceRoleKey: SERVICE_ROLE_KEY } = config;
 
-  const authHeader = req.headers?.authorization || "";
-  const token = authHeader.replace("Bearer ", "").trim();
+  // Rate Limiting defensivo
+  const clientIp = req.headers?.['x-forwarded-for'] || req.socket?.remoteAddress || 'trainers-client';
+  if (!checkRateLimit(`trainers:${clientIp}`, 60, 60000)) {
+    return sendResponse(429, { error: "Muitas requisições. Tente novamente mais tarde." });
+  }
 
-  // Helper para obter usuário autenticado pelo token JWT do Supabase
-  const getAuthUser = async (userToken) => {
-    if (!userToken) return null;
-    try {
-      const response = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-        headers: {
-          apikey: SERVICE_ROLE_KEY,
-          Authorization: `Bearer ${userToken}`,
-        },
-      });
-      if (!response.ok) return null;
-      return await response.json();
-    } catch {
-      return null;
-    }
-  };
-
-  // Helper para verificar se usuário é Administrador
-  const verifyIsAdmin = async (userId) => {
-    if (!userId) return false;
-    try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/admin_users?user_id=eq.${encodeURIComponent(userId)}&select=user_id`, {
-        headers: {
-          apikey: SERVICE_ROLE_KEY,
-          Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
-        },
-      });
-      if (!response.ok) return false;
-      const data = await response.json();
-      return Array.isArray(data) && data.length > 0;
-    } catch {
-      return false;
-    }
-  };
-
+  const token = extractBearerToken(req);
   const action = (req.query && req.query.action) || (req.body && req.body.action);
 
   // ==============================================================================
@@ -103,7 +67,7 @@ export default async function handler(req, res) {
   }
 
   // A partir daqui, autenticação é estritamente obrigatória
-  const user = await getAuthUser(token);
+  const user = await validateUserToken(token, SUPABASE_URL, SERVICE_ROLE_KEY);
   if (!user || !user.id) {
     return sendResponse(401, { error: "Não autorizado. Faça login para acessar esta funcionalidade." });
   }
@@ -428,7 +392,7 @@ export default async function handler(req, res) {
 
     // 6. VERIFICAÇÃO ADMINISTRATIVA DE CREF
     if (action === "admin-verify-cref") {
-      const isAdmin = await verifyIsAdmin(user.id);
+      const isAdmin = await verifyIsAdmin(user.id, SUPABASE_URL, SERVICE_ROLE_KEY);
       if (!isAdmin) {
         return sendResponse(403, { error: "Apenas administradores podem verificar cadastros de CREF." });
       }

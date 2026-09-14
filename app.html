@@ -4393,7 +4393,9 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
 
         // 2. Se não encontrou, buscar via API administrativa de usuários
         if (!foundUser) {
-          const res = await fetch('/api/users');
+          const token = (await _supabase?.auth?.getSession())?.data?.session?.access_token;
+          const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+          const res = await fetch('/api/users', { headers });
           if (res.ok) {
             const allUsers = await res.json();
             const target = (Array.isArray(allUsers) ? allUsers : (allUsers.users || [])).find(u => (u.email || '').toLowerCase() === email);
@@ -4998,7 +5000,9 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
             let totalUsers = null;
             // 1. Tentar endpoint oficial /api/users
             try {
-              const apiResp = await fetch('/api/users');
+              const token = (await _supabase?.auth?.getSession())?.data?.session?.access_token;
+              const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+              const apiResp = await fetch('/api/users', { headers });
               if (apiResp.ok) {
                 const apiJson = await apiResp.json();
                 if (apiJson && typeof apiJson.total === 'number') totalUsers = apiJson.total;
@@ -6532,9 +6536,12 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
 
       // 3. Fallback via endpoint serverless /api/legal
       try {
+        const token = (await _supabase?.auth?.getSession())?.data?.session?.access_token;
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
         fetch('/api/legal', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(record)
         }).catch(() => {});
       } catch (_) {}

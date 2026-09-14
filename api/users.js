@@ -1,4 +1,5 @@
 import { getSupabaseServerConfig, createCorsHeaders } from "./_config.js";
+import { requireAdmin, checkRateLimit, sendStandardResponse } from "./_auth.js";
 
 export default async function handler(req, res) {
   const origin = req.headers?.origin || "*";
@@ -14,13 +15,7 @@ export default async function handler(req, res) {
   }
 
   const sendResponse = (statusCode, data) => {
-    if (res && typeof res.status === "function") {
-      return res.status(statusCode).json(data);
-    }
-    return new Response(JSON.stringify(data), {
-      status: statusCode,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return sendStandardResponse(res, statusCode, data, corsHeaders);
   };
 
   const config = getSupabaseServerConfig();
@@ -29,62 +24,16 @@ export default async function handler(req, res) {
   }
   const { supabaseUrl: SUPABASE_URL, serviceRoleKey: SERVICE_ROLE_KEY } = config;
 
-  // 1. Extrair token de autorização Bearer
-  const authHeader = req.headers?.authorization || req.headers?.Authorization;
-  const token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.substring(7) : null;
-
-  if (!token) {
-    return sendResponse(401, { error: "Token de autenticação não fornecido." });
+  // Rate Limiting para endpoints administrativos
+  const clientIp = req.headers?.['x-forwarded-for'] || req.socket?.remoteAddress || 'admin-client';
+  if (!checkRateLimit(`admin:${clientIp}`, 100, 60000)) {
+    return sendResponse(429, { error: "Muitas requisições. Tente novamente mais tarde." });
   }
 
-  // Validar usuário pelo token
-  let callerUser = null;
-  try {
-    const authRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-      headers: {
-        apikey: SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    if (authRes.ok) {
-      callerUser = await authRes.json();
-    }
-  } catch (_) {}
-
-  if (!callerUser || !callerUser.id) {
-    return sendResponse(401, { error: "Sessão inválida ou expirada." });
-  }
-
-  // 2. Verificar se o chamador é Administrador ativo via user_roles
-  let isAdmin = false;
-  try {
-    const roleCheck = await fetch(`${SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${encodeURIComponent(callerUser.id)}&role=eq.admin&active=eq.true&select=id`, {
-      headers: {
-        apikey: SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
-      },
-    });
-    if (roleCheck.ok) {
-      const roles = await roleCheck.json();
-      if (Array.isArray(roles) && roles.length > 0) isAdmin = true;
-    }
-
-    if (!isAdmin) {
-      const legRes = await fetch(`${SUPABASE_URL}/rest/v1/admin_users?user_id=eq.${encodeURIComponent(callerUser.id)}&select=user_id`, {
-        headers: {
-          apikey: SERVICE_ROLE_KEY,
-          Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
-        },
-      });
-      if (legRes.ok) {
-        const leg = await legRes.json();
-        if (Array.isArray(leg) && leg.length > 0) isAdmin = true;
-      }
-    }
-  } catch (_) {}
-
-  if (!isAdmin) {
-    return sendResponse(403, { error: "Acesso não autorizado: permissão de Administrador requerida." });
+  // Validação estrita de sessão e papel de Administrador
+  const { adminUser: callerUser, errorResponse } = await requireAdmin(req, SUPABASE_URL, SERVICE_ROLE_KEY);
+  if (errorResponse) {
+    return sendResponse(errorResponse.status, errorResponse.body);
   }
 
   // Helper para auditoria
