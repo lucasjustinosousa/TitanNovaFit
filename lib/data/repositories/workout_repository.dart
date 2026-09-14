@@ -26,19 +26,57 @@ class WorkoutRepository extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    // Criar usuário convidado padrão se nenhum logado
-    _usuarioAtual = Usuario(
-      id: 'guest_user_1',
-      nome: 'Atleta TitanNova',
-      email: 'atleta@titannovafit.com',
-      unidadeCarga: 'kg',
-      descansoPadrao: 60,
-      criadoEm: DateTime.now(),
-    );
+    // Se houver usuário autenticado no Supabase, inicializar com a sessão ativa
+    final authUser = SupabaseService.instance.currentUser;
+    if (authUser != null) {
+      final email = authUser.email ?? '';
+      final meta = authUser.userMetadata ?? {};
+      final nome = (meta['nome'] as String?) ?? (email.isNotEmpty ? email.split('@')[0] : 'Atleta TitanNova');
+      _usuarioAtual = Usuario(
+        id: authUser.id,
+        nome: nome,
+        email: email,
+        unidadeCarga: 'kg',
+        descansoPadrao: 60,
+        criadoEm: DateTime.now(),
+      );
+    } else {
+      _usuarioAtual = null;
+    }
 
     await carregarDados();
     _isLoading = false;
     notifyListeners();
+  }
+
+  /// Define o usuário ativo e recarrega os dados locais isolados
+  Future<void> definirUsuario(Usuario? user) async {
+    _usuarioAtual = user;
+    _isLoading = true;
+    notifyListeners();
+    await carregarDados();
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  /// Define o usuário ativo a partir de um objeto de autenticação do Supabase
+  Future<void> definirUsuarioAutenticado(dynamic authUser) async {
+    if (authUser == null) {
+      await definirUsuario(null);
+      return;
+    }
+    final email = (authUser.email as String?) ?? '';
+    final meta = (authUser.userMetadata as Map<String, dynamic>?) ?? {};
+    final nome = (meta['nome'] as String?) ?? (email.isNotEmpty ? email.split('@')[0] : 'Atleta TitanNova');
+    final usuario = Usuario(
+      id: authUser.id as String,
+      nome: nome,
+      email: email,
+      unidadeCarga: 'kg',
+      descansoPadrao: 60,
+      criadoEm: DateTime.now(),
+    );
+    await definirUsuario(usuario);
   }
 
   Future<void> carregarDados() async {
@@ -46,18 +84,28 @@ class WorkoutRepository extends ChangeNotifier {
       // 1. Carregar exercícios da biblioteca local
       _exercicios = await LocalDatabase.instance.getExercicios();
 
-      // 2. Carregar treinos locais do SQLite
-      _treinos = await LocalDatabase.instance.getTreinos(_usuarioAtual?.id ?? 'guest_user_1');
-      _historico = await LocalDatabase.instance.getHistoricoSessoes();
+      // Se nenhum usuário autenticado ou convidado ativo, limpar treinos e histórico
+      if (_usuarioAtual == null) {
+        _treinos = [];
+        _historico = [];
+        notifyListeners();
+        return;
+      }
 
-      // 3. Se nenhum treino cadastrado ainda localmente, gerar treinos padrão de exemplo (A, B, C)
+      final uid = _usuarioAtual!.id;
+
+      // 2. Carregar treinos locais do SQLite filtrados estritamente pelo usuarioAtual
+      _treinos = await LocalDatabase.instance.getTreinos(uid);
+      _historico = await LocalDatabase.instance.getHistoricoSessoes(uid);
+
+      // 3. Se nenhum treino cadastrado ainda localmente para este usuário, gerar treinos padrão
       if (_treinos.isEmpty && _exercicios.isNotEmpty) {
         await _seedDefaultTreinos();
-        _treinos = await LocalDatabase.instance.getTreinos(_usuarioAtual?.id ?? 'guest_user_1');
+        _treinos = await LocalDatabase.instance.getTreinos(uid);
       }
 
       // 4. Sincronização Bidirecional completa com a Nuvem (Supabase)
-      if (SupabaseService.instance.isInitialized) {
+      if (SupabaseService.instance.isInitialized && SupabaseService.instance.currentUser != null) {
         final treinosOnline = await SupabaseService.instance.fetchTreinosOnline();
         
         // A) Salvar no SQLite qualquer treino que esteja na nuvem e não no SQLite
@@ -76,8 +124,8 @@ class WorkoutRepository extends ChangeNotifier {
           }
         }
 
-        // Recarregar lista consolidada de treinos
-        _treinos = await LocalDatabase.instance.getTreinos(_usuarioAtual?.id ?? 'guest_user_1');
+        // Recarregar lista consolidada de treinos isolados do usuário
+        _treinos = await LocalDatabase.instance.getTreinos(uid);
       }
     } catch (e) {
       debugPrint('Erro ao carregar e sincronizar dados: $e');
@@ -86,6 +134,9 @@ class WorkoutRepository extends ChangeNotifier {
   }
 
   Future<void> _seedDefaultTreinos() async {
+    if (_usuarioAtual == null) return;
+    final uid = _usuarioAtual!.id;
+
     final peito = _exercicios.firstWhere((e) => e.grupoMuscular == 'Peito', orElse: () => _exercicios.first);
     final triceps = _exercicios.firstWhere((e) => e.grupoMuscular == 'Tríceps', orElse: () => _exercicios.first);
     final costas = _exercicios.firstWhere((e) => e.grupoMuscular == 'Costas', orElse: () => _exercicios.first);
@@ -93,30 +144,30 @@ class WorkoutRepository extends ChangeNotifier {
     final pernas = _exercicios.firstWhere((e) => e.grupoMuscular == 'Pernas', orElse: () => _exercicios.first);
 
     final treinoA = Treino(
-      id: 'treino_default_a',
-      usuarioId: _usuarioAtual!.id,
+      id: 'treino_${uid}_a',
+      usuarioId: uid,
       nome: 'Treino A — Peito & Tríceps',
       descricao: 'Hipertrofia',
       diasSemana: ['Segunda-feira', 'Quinta-feira'],
       corHex: '#1E88E5',
       criadoEm: DateTime.now(),
       exercicios: [
-        ExercicioDoTreino(id: 'ex_a1', treinoId: 'treino_default_a', exercicioId: peito.id, ordem: 1, quantidadeSeries: 4, repeticoes: '10-12', cargaInicial: 30, descansoSegundos: 90, exercicioInfo: peito),
-        ExercicioDoTreino(id: 'ex_a2', treinoId: 'treino_default_a', exercicioId: triceps.id, ordem: 2, quantidadeSeries: 3, repeticoes: '12-15', cargaInicial: 20, descansoSegundos: 60, exercicioInfo: triceps),
+        ExercicioDoTreino(id: 'ex_${uid}_a1', treinoId: 'treino_${uid}_a', exercicioId: peito.id, ordem: 1, quantidadeSeries: 4, repeticoes: '10-12', cargaInicial: 30, descansoSegundos: 90, exercicioInfo: peito),
+        ExercicioDoTreino(id: 'ex_${uid}_a2', treinoId: 'treino_${uid}_a', exercicioId: triceps.id, ordem: 2, quantidadeSeries: 3, repeticoes: '12-15', cargaInicial: 20, descansoSegundos: 60, exercicioInfo: triceps),
       ],
     );
 
     final treinoB = Treino(
-      id: 'treino_default_b',
-      usuarioId: _usuarioAtual!.id,
+      id: 'treino_${uid}_b',
+      usuarioId: uid,
       nome: 'Treino B — Costas & Bíceps',
       descricao: 'Hipertrofia',
       diasSemana: ['Terça-feira', 'Sexta-feira'],
       corHex: '#00D2FF',
       criadoEm: DateTime.now(),
       exercicios: [
-        ExercicioDoTreino(id: 'ex_b1', treinoId: 'treino_default_b', exercicioId: costas.id, ordem: 1, quantidadeSeries: 4, repeticoes: '10-12', cargaInicial: 40, descansoSegundos: 90, exercicioInfo: costas),
-        ExercicioDoTreino(id: 'ex_b2', treinoId: 'treino_default_b', exercicioId: biceps.id, ordem: 2, quantidadeSeries: 3, repeticoes: '10-12', cargaInicial: 12, descansoSegundos: 60, exercicioInfo: biceps),
+        ExercicioDoTreino(id: 'ex_${uid}_b1', treinoId: 'treino_${uid}_b', exercicioId: costas.id, ordem: 1, quantidadeSeries: 4, repeticoes: '10-12', cargaInicial: 40, descansoSegundos: 90, exercicioInfo: costas),
+        ExercicioDoTreino(id: 'ex_${uid}_b2', treinoId: 'treino_${uid}_b', exercicioId: biceps.id, ordem: 2, quantidadeSeries: 3, repeticoes: '10-12', cargaInicial: 12, descansoSegundos: 60, exercicioInfo: biceps),
       ],
     );
 
@@ -124,29 +175,29 @@ class WorkoutRepository extends ChangeNotifier {
     final abdomen = _exercicios.firstWhere((e) => e.grupoMuscular == 'Abdômen', orElse: () => _exercicios.first);
 
     final treinoC = Treino(
-      id: 'treino_default_c',
-      usuarioId: _usuarioAtual!.id,
+      id: 'treino_${uid}_c',
+      usuarioId: uid,
       nome: 'Treino C — Pernas & Panturrilhas',
       descricao: 'Força & Resistência',
       diasSemana: ['Quarta-feira', 'Sábado'],
       corHex: '#4CAF50',
       criadoEm: DateTime.now(),
       exercicios: [
-        ExercicioDoTreino(id: 'ex_c1', treinoId: 'treino_default_c', exercicioId: pernas.id, ordem: 1, quantidadeSeries: 4, repeticoes: '8-10', cargaInicial: 60, descansoSegundos: 120, exercicioInfo: pernas),
+        ExercicioDoTreino(id: 'ex_${uid}_c1', treinoId: 'treino_${uid}_c', exercicioId: pernas.id, ordem: 1, quantidadeSeries: 4, repeticoes: '8-10', cargaInicial: 60, descansoSegundos: 120, exercicioInfo: pernas),
       ],
     );
 
     final treinoD = Treino(
-      id: 'treino_default_d',
-      usuarioId: _usuarioAtual!.id,
+      id: 'treino_${uid}_d',
+      usuarioId: uid,
       nome: 'Treino D — Ombros, Trapézio & Abdômen',
       descricao: 'Definição & Core',
       diasSemana: ['Sexta-feira'],
       corHex: '#FF9800',
       criadoEm: DateTime.now(),
       exercicios: [
-        ExercicioDoTreino(id: 'ex_d1', treinoId: 'treino_default_d', exercicioId: ombros.id, ordem: 1, quantidadeSeries: 4, repeticoes: '10-12', cargaInicial: 16, descansoSegundos: 60, exercicioInfo: ombros),
-        ExercicioDoTreino(id: 'ex_d2', treinoId: 'treino_default_d', exercicioId: abdomen.id, ordem: 2, quantidadeSeries: 3, repeticoes: '15-20', cargaInicial: 0, descansoSegundos: 45, exercicioInfo: abdomen),
+        ExercicioDoTreino(id: 'ex_${uid}_d1', treinoId: 'treino_${uid}_d', exercicioId: ombros.id, ordem: 1, quantidadeSeries: 4, repeticoes: '10-12', cargaInicial: 16, descansoSegundos: 60, exercicioInfo: ombros),
+        ExercicioDoTreino(id: 'ex_${uid}_d2', treinoId: 'treino_${uid}_d', exercicioId: abdomen.id, ordem: 2, quantidadeSeries: 3, repeticoes: '15-20', cargaInicial: 0, descansoSegundos: 45, exercicioInfo: abdomen),
       ],
     );
 
@@ -155,7 +206,7 @@ class WorkoutRepository extends ChangeNotifier {
     await LocalDatabase.instance.saveTreino(treinoC);
     await LocalDatabase.instance.saveTreino(treinoD);
 
-    if (SupabaseService.instance.isInitialized) {
+    if (SupabaseService.instance.isInitialized && SupabaseService.instance.currentUser != null) {
       await SupabaseService.instance.syncTreino(treinoA);
       await SupabaseService.instance.syncTreino(treinoB);
       await SupabaseService.instance.syncTreino(treinoC);

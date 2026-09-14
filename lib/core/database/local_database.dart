@@ -512,10 +512,17 @@ class LocalDatabase {
     );
   }
 
-  // Métodos CRUD para Treinos
+  // Métodos CRUD para Treinos com isolamento por usuário
   Future<List<Treino>> getTreinos(String usuarioId) async {
     final db = await instance.database;
-    final result = await db.query('treinos', orderBy: 'criado_em DESC');
+    final result = usuarioId.isNotEmpty
+        ? await db.query(
+            'treinos',
+            where: 'usuario_id = ?',
+            whereArgs: [usuarioId],
+            orderBy: 'criado_em DESC',
+          )
+        : <Map<String, Object?>>[];
     
     List<Treino> treinos = [];
     for (var row in result) {
@@ -561,7 +568,7 @@ class LocalDatabase {
     await db.delete('exercicios_do_treino', where: 'treino_id = ?', whereArgs: [treinoId]);
   }
 
-  // Métodos para Sessão de Treino e Séries Realizadas
+  // Métodos para Sessão de Treino e Séries Realizadas com isolamento por usuário
   Future<void> salvarSessaoRealizada(SessaoTreino sessao, List<SerieRealizada> series) async {
     final db = await instance.database;
     await db.transaction((txn) async {
@@ -572,9 +579,16 @@ class LocalDatabase {
     });
   }
 
-  Future<List<SessaoTreino>> getHistoricoSessoes() async {
+  Future<List<SessaoTreino>> getHistoricoSessoes([String? usuarioId]) async {
     final db = await instance.database;
-    final result = await db.query('sessoes_de_treino', orderBy: 'inicio DESC');
+    final result = (usuarioId != null && usuarioId.isNotEmpty)
+        ? await db.query(
+            'sessoes_de_treino',
+            where: 'usuario_id = ?',
+            whereArgs: [usuarioId],
+            orderBy: 'inicio DESC',
+          )
+        : await db.query('sessoes_de_treino', orderBy: 'inicio DESC');
     return result.map((json) => SessaoTreino.fromMap(json)).toList();
   }
 

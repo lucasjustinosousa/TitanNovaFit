@@ -58,6 +58,19 @@ class _MainRootNavigatorState extends State<MainRootNavigator> {
   bool _isAuthenticated = false;
   int _currentTabIndex = 0;
 
+  @override
+  void initState() {
+    super.initState();
+    _checkInitialAuth();
+  }
+
+  void _checkInitialAuth() {
+    final user = SupabaseService.instance.currentUser;
+    if (user != null) {
+      _isAuthenticated = true;
+    }
+  }
+
   void _startWorkout(Treino treino) {
     Navigator.push(
       context,
@@ -90,10 +103,15 @@ class _MainRootNavigatorState extends State<MainRootNavigator> {
       const ExerciseLibraryScreen(modoSelecao: false),
       const HistoryScreen(),
       ProfileScreen(
-        onLogout: () {
-          setState(() {
-            _isAuthenticated = false;
-          });
+        onLogout: () async {
+          await SupabaseService.instance.signOut();
+          if (mounted) {
+            await Provider.of<WorkoutRepository>(context, listen: false).definirUsuario(null);
+            setState(() {
+              _isAuthenticated = false;
+              _currentTabIndex = 0;
+            });
+          }
         },
       ),
     ];
