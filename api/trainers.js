@@ -1,24 +1,35 @@
-// ==============================================================================
-// TITANNOVA FIT - BACKEND API: MODO PERSONAL TRAINER E ATLETAS
-// Rota: /api/trainers
-// ==============================================================================
+import { getSupabaseServerConfig, createCorsHeaders } from "./_config.js";
 
-const SUPABASE_URL = process.env.SUPABASE_URL || "https://gplgywrvejefulsjpkax.supabase.co";
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdwbGd5d3J2ZWplZnVsc2pwa2F4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY3MjMyNSwiZXhwIjoyMDg4MjQ4MzI1fQ.kYx2Gz6m7Xz1F_0LwVqY2v_5b3q1j5X9j6X2Gz6m7X0";
+export default async function handler(req, res) {
+  const origin = req.headers?.origin || "*";
+  const corsHeaders = createCorsHeaders(origin, "GET, POST, OPTIONS");
 
-module.exports = async (req, res) => {
-  // CORS Headers
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  if (res && typeof res.setHeader === "function") {
+    Object.entries(corsHeaders).forEach(([key, val]) => res.setHeader(key, val));
+  }
 
   if (req.method === "OPTIONS") {
-    return res.status(200).end();
+    if (res && typeof res.status === "function") {
+      return res.status(200).end();
+    }
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   const sendResponse = (status, data) => {
-    return res.status(status).json(data);
+    if (res && typeof res.status === "function") {
+      return res.status(status).json(data);
+    }
+    return new Response(JSON.stringify(data), {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   };
+
+  const config = getSupabaseServerConfig();
+  if (!config.isValid) {
+    return sendResponse(500, { error: config.error });
+  }
+  const { supabaseUrl: SUPABASE_URL, serviceRoleKey: SERVICE_ROLE_KEY } = config;
 
   const authHeader = req.headers?.authorization || "";
   const token = authHeader.replace("Bearer ", "").trim();
@@ -454,4 +465,4 @@ module.exports = async (req, res) => {
   }
 
   return sendResponse(400, { error: "Ação não suportada ou método inválido." });
-};
+}

@@ -1,21 +1,31 @@
-// api/legal.js — TitanNova Fit Legal & Privacy API
-// Registra e verifica aceites legais de Termos e Privacidade (LGPD)
+import { getSupabaseServerConfig, createCorsHeaders } from './_config.js';
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
-  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+  const origin = req.headers?.origin || '*';
+  const corsHeaders = createCorsHeaders(origin, 'GET, OPTIONS, POST');
+  if (res && typeof res.setHeader === 'function') {
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
   }
 
-  const SUPABASE_URL = process.env.SUPABASE_URL || "https://gplgywrvejefulsjpkax.supabase.co";
-  // Obter service key do ambiente ou fallback seguro codificado em base64
-  const fallbackKeyB64 = "c2Jfc2VjcmV0X2p5eWdfVC0tdDhPWFNPQ3k0NXB1blFfNXpwcG5vaGs=";
-  const SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY || 
-    Buffer.from(fallbackKeyB64, 'base64').toString('utf-8');
+  if (req.method === 'OPTIONS') {
+    if (res && typeof res.status === 'function') {
+      return res.status(200).end();
+    }
+    return new Response(null, { status: 200, headers: corsHeaders });
+  }
+
+  const config = getSupabaseServerConfig();
+  if (!config.isValid) {
+    if (res && typeof res.status === 'function') {
+      return res.status(500).json({ error: config.error });
+    }
+    return new Response(JSON.stringify({ error: config.error }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+  const { supabaseUrl: SUPABASE_URL, serviceRoleKey: SUPABASE_SERVICE_ROLE } = config;
 
   // 1. GET: Consultar status de aceite do usuário
   if (req.method === 'GET') {
