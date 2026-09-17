@@ -9694,9 +9694,6 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       rowsContainer.insertAdjacentHTML('beforeend', newRowHtml);
       saveActiveSessionToStorage();
     }
-      rowsContainer.insertAdjacentHTML('beforeend', newRowHtml);
-      saveActiveSessionToStorage();
-    }
 
     function removeActiveExerciseSet(exIdx) {
       const card = document.querySelector(`.active-exercise-card[data-ex-index="${exIdx}"]`);
@@ -12200,8 +12197,8 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
         heroSubtitleEl.innerText = `${numEx} exercícios · aproximadamente ${estimatedDuration} minutos`;
       }
 
-      const safeWorkoutParam = (recommended.id || recommended.nome).replace(/'/g, "\\'");
-      heroBtnEl.onclick = () => startActiveWorkout(safeWorkoutParam);
+      const workoutTarget = recommended.id || recommended.nome;
+      heroBtnEl.onclick = () => startActiveWorkout(workoutTarget);
     }
 
     // ==========================================
@@ -14092,10 +14089,23 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
         currentAuthUser = null;
         if (navEl) navEl.style.display = 'none';
         switchTab('screenAuth');
-        switchAuthMode('login');
+        const h = (window.location.hash || '').toLowerCase();
+        if (h.includes('cadastr') || h.includes('register') || h.includes('signup')) {
+          switchAuthMode('register');
+        } else {
+          switchAuthMode('login');
+        }
       }
 
       checkCookieConsentPrompt();
+    }
+
+    function handlePublicHashRouting() {
+      const currentHash = (window.location.hash || '').toLowerCase();
+      if (currentHash.includes('termos')) openTermsModal();
+      else if (currentHash.includes('politica') || currentHash.includes('privacidade')) openPrivacyModal();
+      else if (currentHash.includes('cookies') || currentHash.includes('configuracoes-de-privacidade')) openPrivacySettingsModal();
+      else if (currentHash.includes('excluir-conta')) openDeleteAccountModal();
     }
 
     // Carregar sessão de usuário, treinos sincronizados na nuvem, histórico e restaurar estado
@@ -14117,6 +14127,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
         console.log("[BOOT 1] Novo visitante sem sessão salva. Transição imediata para login/cadastro.");
         setAuthStatus('unauthenticated');
         loadExercisesLibrary().catch(err => console.error("[AUTH ERROR] loadExercisesLibrary:", err));
+        handlePublicHashRouting();
         return;
       }
 
@@ -14237,11 +14248,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
         loadExercisesLibrary().catch(err => console.error("[AUTH ERROR] loadExercisesLibrary:", err));
 
         // Roteamento direto por hash público (termos, politica, etc.)
-        const currentHash = (window.location.hash || '').toLowerCase();
-        if (currentHash.includes('termos')) openTermsModal();
-        else if (currentHash.includes('politica') || currentHash.includes('privacidade')) openPrivacyModal();
-        else if (currentHash.includes('cookies') || currentHash.includes('configuracoes-de-privacidade')) openPrivacySettingsModal();
-        else if (currentHash.includes('excluir-conta')) openDeleteAccountModal();
+        handlePublicHashRouting();
 
       } catch (fatalBootErr) {
         console.error("[AUTH ERROR] Erro crítico no boot:", fatalBootErr);
@@ -14260,7 +14267,11 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       if (h.includes('cookies') || h.includes('configuracoes-de-privacidade')) { openPrivacySettingsModal(); return; }
       if (h.includes('excluir-conta')) { openDeleteAccountModal(); return; }
 
-      if (!currentAuthUser) return;
+      if (!currentAuthUser) {
+        if (h.includes('cadastr') || h.includes('register') || h.includes('signup')) switchAuthMode('register');
+        else if (h.includes('login') || h.includes('entrar')) switchAuthMode('login');
+        return;
+      }
       if (h.includes('admin')) navigateToAdminPanel();
       else if (h.includes('evolucao') || h.includes('evolution') || h.includes('graficos')) { switchTab('screenHistory'); switchHistorySubTab('charts'); }
       else if (h.includes('recordes') || h.includes('prs')) { switchTab('screenHistory'); switchHistorySubTab('prs'); }

@@ -384,7 +384,15 @@ class TestUXSimplificationAndPWAOptimizations(unittest.TestCase):
         self.assertIn("PlanProvider.isAdmin", self.app_html)
         self.assertIn("mode === 'trainer'", self.app_html)
 
+    def test_add_active_exercise_set_syntax_integrity(self):
+        """Valida que addActiveExerciseSet não possui comandos duplicados ou erro de sintaxe"""
+        self.assertIn("function addActiveExerciseSet(exIdx)", self.app_html)
+        self.assertNotIn("saveActiveSessionToStorage();\n    }\n      rowsContainer.insertAdjacentHTML", self.app_html)
+        self.assertIn("function handlePublicHashRouting()", self.app_html)
+        self.assertIn("workoutTarget = recommended.id || recommended.nome;", self.app_html)
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
