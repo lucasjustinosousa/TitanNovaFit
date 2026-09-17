@@ -27,3 +27,9 @@ Thumbs.db
 
 # Scratch and Temporary Scripts
 scratch/
+
+# Python Cache
+__pycache__/
+*.pyc
+*.pyo
+

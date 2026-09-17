@@ -1056,7 +1056,7 @@
     <div id="restTimerBar" class="rest-timer-bar">
       <div style="display: flex; justify-content: space-between; align-items: center;">
         <span style="color: var(--accent-cyan); font-weight: 700; font-size: 13px;">⏳ CRONÔMETRO DE DESCANSO</span>
-        <span id="restTimerText" style="font-size: 20px; font-weight: 900; color: white;">00:60</span>
+        <span id="restTimerText" style="font-size: 20px; font-weight: 900; color: white;">01:00</span>
       </div>
       <div class="progress-bar-bg">
         <div id="restProgressFill" class="progress-bar-fill"></div>
@@ -9238,6 +9238,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       const sStr = String(s % 60).padStart(2, '0');
       return `${mStr}:${sStr}`;
     }
+    window.formatSecondsToMMSS = formatSecondsToMMSS;
 
     function updateActiveWorkoutTimerUI() {
       const timeStr = formatSecondsToMMSS(activeWorkoutSeconds);
@@ -10109,10 +10110,8 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
     }
 
     function updateRestUI() {
-      let m = String(Math.floor(restTimeRemaining / 60)).padStart(2, '0');
-      let s = String(restTimeRemaining % 60).padStart(2, '0');
       const textEl = document.getElementById('restTimerText');
-      if (textEl) textEl.innerText = `${m}:${s}`;
+      if (textEl) textEl.innerText = formatSecondsToMMSS(restTimeRemaining);
       let total = Math.max(restTotalDuration, restTimeRemaining, 1);
       let fillPct = Math.min(100, Math.max(0, (restTimeRemaining / total) * 100));
       const fillEl = document.getElementById('restProgressFill');
