@@ -8,9 +8,11 @@ Este documento formaliza a arquitetura do projeto **TitanNova Fit**, definindo o
 
 | Componente | Nível | Stack Tecnológica | Finalidade |
 | :--- | :--- | :--- | :--- |
-| **Web / PWA** | **Principal (Produção)** | HTML5, CSS3 Vanilla, JavaScript Vanilla, Supabase JS v2, Service Worker | Aplicação oficial em produção servida via Vercel em `https://titannovafit.com.br`. Possui suporte completo a PWA offline, sincronização com nuvem, cronômetros de treino e painel administrativo. |
-| **Serverless API** | **Principal (Backend)** | Node.js Serverless Functions (`/api/*` na Vercel) | Endpoints seguros de retaguarda para gestão administrativa (`/api/users`), treinadores (`/api/trainers`), assinaturas (`/api/subscriptions`), termos legais (`/api/legal`) e catálogo de exercícios (`/api/exercises`). |
-| **Flutter Mobile** | **Secundário (Em Evolução)** | Flutter 3.16+, Dart 3.0+, SQLite (sqflite) | Aplicativo cliente nativo complementar para empacotamento em APK/AAB (Android) e IPA (iOS). Compartilha a mesma base de dados remota no Supabase. |
+| **Web / PWA** | **Principal (Fonte da Verdade & Produção)** | HTML5, CSS3 Vanilla, JavaScript Vanilla, Supabase JS v2, Service Worker | Aplicação oficial em produção servida via Vercel em `https://titannovafit.com.br`. Define a fonte da verdade para regras de negócio, UX limpa, fluxos de treino em 1 toque, segurança LGPD e offline-first com sincronização resiliente. |
+| **Serverless API** | **Principal (Backend & Governança)** | Node.js Serverless Functions (`/api/*` na Vercel) | Endpoints seguros de retaguarda para gestão administrativa (`/api/users`), treinadores (`/api/trainers`), assinaturas (`/api/subscriptions`), termos legais (`/api/legal`) e catálogo de exercícios (`/api/exercises`). |
+| **Flutter Mobile** | **Secundário (Paridade com PWA)** | Flutter 3.16+, Dart 3.0+, SQLite (sqflite) | Aplicativo cliente nativo complementar para empacotamento em APK/AAB (Android) e IPA (iOS). Segue a esteira de paridade com o PWA, adotando os mesmos estados de autenticação limpos, bloqueio para CREF pendente e foco dominante no próximo treino. |
+
+> **Diretriz Arquitetural Permanente**: Qualquer nova funcionalidade, regra comercial ou ajuste de experiência deve ser primeiramente consolidado e testado no **PWA (`app.html` e `index.html`)** antes de ser transposto para o cliente nativo Flutter (`lib/`).
 
 ---
 

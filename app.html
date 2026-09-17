@@ -295,14 +295,32 @@
     .rest-timer-bar {
       background: #1a2332;
       border-bottom: 2px solid var(--accent-cyan);
-      padding: 12px 16px;
+      padding: 14px 18px;
       display: none;
       flex-direction: column;
       gap: 8px;
+      transition: all 0.3s ease;
     }
 
     .rest-timer-bar.active {
       display: flex;
+    }
+
+    .rest-timer-bar.finished-pulse {
+      animation: restPulseAlert 0.6s ease-in-out 3;
+      border-color: var(--success-green);
+    }
+
+    @keyframes restPulseAlert {
+      0%, 100% { box-shadow: 0 0 0 rgba(76, 175, 80, 0); }
+      50% { box-shadow: 0 0 24px rgba(76, 175, 80, 0.7); }
+    }
+
+    .rest-timer-bar #restTimerText {
+      font-size: 28px !important;
+      font-weight: 900;
+      letter-spacing: 1px;
+      color: white;
     }
 
     .progress-bar-bg {
@@ -1057,10 +1075,10 @@
   <div id="appInitialLoadingOverlay" style="position: fixed; inset: 0; background: var(--bg-black); z-index: 99999; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center;">
     <img src="assets/icons/logo.png" alt="TitanNova Fit" style="width: 76px; height: 76px; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,210,255,0.4); margin-bottom: 18px;">
     <div style="font-size: 22px; font-weight: 900; letter-spacing: 1px; color: white;">TITANNOVA <span style="color: var(--accent-cyan);">FIT</span></div>
-    <div id="appInitialLoadingStatus" style="font-size: 13px; color: var(--text-grey); margin-top: 8px; font-weight: 600;">Verificando sessão segura no Supabase...</div>
+    <div id="appInitialLoadingStatus" style="font-size: 13px; color: var(--text-grey); margin-top: 8px; font-weight: 600;">Carregando TitanNova Fit...</div>
     <div id="appInitialLoadingSpinner" style="margin-top: 18px; font-size: 26px; animation: spinIcon 1s linear infinite;">🔄</div>
     <div id="appSessionErrorBox" style="display: none; margin-top: 20px; max-width: 330px; background: rgba(255,82,82,0.12); border: 1px solid rgba(255,82,82,0.35); border-radius: 12px; padding: 16px;">
-      <p style="color: #ff8080; font-size: 13px; line-height: 1.4; margin-bottom: 12px; font-weight: 600;">Não foi possível verificar sua sessão. Verifique sua conexão e tente novamente.</p>
+      <p style="color: #ff8080; font-size: 13px; line-height: 1.4; margin-bottom: 12px; font-weight: 600;">Falha ao conectar com o servidor. Seus dados locais continuam seguros neste dispositivo.</p>
       <button onclick="window.location.reload()" class="btn btn-outline" style="font-size: 12px; padding: 8px 16px; border-color: var(--accent-cyan); color: var(--accent-cyan);">Tentar novamente</button>
       <button id="appContinueOfflineBtn" onclick="continueOfflineMode()" class="btn btn-text" style="font-size: 11px; color: var(--text-grey); margin-top: 8px; display: none;">Continuar em Modo Offline</button>
     </div>
@@ -1092,13 +1110,11 @@
       <div class="progress-bar-bg">
         <div id="restProgressFill" class="progress-bar-fill"></div>
       </div>
-      <div style="display: flex; justify-content: space-around; align-items: center; font-size: 12px; gap: 2px;">
-        <button onclick="adjustRestTimer(-15)" class="btn-text" style="padding: 4px 6px;">-15s</button>
-        <button id="restTimerPauseBtn" onclick="togglePauseRestTimer()" class="btn-text" style="padding: 4px 6px; color: #ffd700; font-weight: 700;">⏸️ Pausar</button>
-        <button onclick="adjustRestTimer(15)" class="btn-text" style="padding: 4px 6px; color: var(--accent-cyan);">+15s</button>
-        <button onclick="adjustRestTimer(30)" class="btn-text" style="padding: 4px 6px; color: var(--accent-cyan);">+30s</button>
-        <button onclick="adjustRestTimer(60)" class="btn-text" style="padding: 4px 6px; color: var(--accent-cyan);">+1min</button>
-        <button onclick="skipRestTimer()" class="btn-text" style="padding: 4px 6px; color: var(--warning-orange); font-weight: 700;">Pular</button>
+      <div style="display: flex; justify-content: space-around; align-items: center; font-size: 12.5px; gap: 6px; padding: 2px 0;">
+        <button id="restTimerPauseBtn" onclick="togglePauseRestTimer()" class="btn-text" style="padding: 6px 10px; color: #ffd700; font-weight: 800;">⏸️ Pausar</button>
+        <button onclick="adjustRestTimer(15)" class="btn-text" style="padding: 6px 10px; color: var(--accent-cyan); font-weight: 700;">+15s</button>
+        <button onclick="adjustRestTimer(30)" class="btn-text" style="padding: 6px 10px; color: var(--accent-cyan); font-weight: 700;">+30s</button>
+        <button onclick="skipRestTimer()" class="btn-text" style="padding: 6px 10px; color: #ff8a80; font-weight: 800;">Encerrar</button>
       </div>
     </div>
 
@@ -1249,7 +1265,7 @@
             <div id="passwordMatchFeedback" style="font-size: 10.5px; margin-top: 4px; font-weight: 700; display: none;"></div>
           </div>
 
-          <!-- CAMPOS ESPECÍFICOS DO ATLETA -->
+          <!-- CAMPOS ESPECÍFICOS DO ATLETA (CADASTRO SIMPLIFICADO) -->
           <div id="registerAthleteSpecificFields">
             <div class="form-group">
               <label class="form-label">Data de Nascimento <span style="color: #ff5252;">*</span></label>
@@ -1258,71 +1274,39 @@
                 ⚠️ <strong>Atenção (Menor de 18 anos):</strong> É indispensável o consentimento expresso dos pais ou responsáveis legais e recomendada avaliação médica prévia para início dos treinos.
               </div>
             </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-              <div class="form-group">
-                <label class="form-label">Objetivo Principal</label>
-                <select id="authRegisterGoal" class="form-input">
-                  <option value="Hipertrofia" selected>💪 Hipertrofia & Massa</option>
-                  <option value="Emagrecimento">🔥 Emagrecimento</option>
-                  <option value="Força">🏋️ Força & Cargas</option>
-                  <option value="Condicionamento">⚡ Condicionamento</option>
-                  <option value="Saúde Geral">🧘 Saúde & Bem-estar</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Nível de Experiência</label>
-                <select id="authRegisterExperience" class="form-input">
-                  <option value="Iniciante">Iniciante (< 6 meses)</option>
-                  <option value="Intermediário" selected>Intermediário (6m a 2a)</option>
-                  <option value="Avançado">Avançado (> 2 anos)</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Telefone / WhatsApp (Opcional)</label>
-              <input type="tel" id="authRegisterPhone" class="form-input" placeholder="(11) 99999-9999">
+            <div style="font-size: 11.5px; color: var(--text-grey); margin-bottom: 8px; line-height: 1.4;">
+              💡 <em>Objetivos, medidas corporais e preferências poderão ser personalizados diretamente no seu perfil após o cadastro.</em>
             </div>
           </div>
 
-          <!-- CAMPOS ESPECÍFICOS DO PERSONAL TRAINER -->
+          <!-- CAMPOS ESPECÍFICOS DO PERSONAL TRAINER (ESTRUTURADO EM 4 ETAPAS) -->
           <div id="registerTrainerSpecificFields" style="display: none;">
-            <div class="form-group">
-              <label class="form-label">Nome Profissional (Como seus alunos verão) <span style="color: #ff5252;">*</span></label>
-              <input type="text" id="authRegisterProfName" class="form-input" placeholder="Ex: Prof. Carlos Silva">
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Telefone / WhatsApp Profissional <span style="color: #ff5252;">*</span></label>
-              <input type="tel" id="authRegisterTrainerPhone" class="form-input" placeholder="(11) 98888-7777">
-            </div>
-
-            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px;">
-              <div class="form-group">
-                <label class="form-label">Cidade</label>
-                <input type="text" id="authRegisterTrainerCity" class="form-input" placeholder="Ex: São Paulo">
+            
+            <!-- Etapa 2: Perfil Profissional -->
+            <div style="background: rgba(22, 26, 36, 0.9); border: 1px solid var(--divider); border-radius: 12px; padding: 14px; margin-bottom: 12px;">
+              <div style="font-size: 11.5px; font-weight: 800; color: var(--accent-cyan); text-transform: uppercase; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                <span>2️⃣</span> Perfil Profissional
               </div>
               <div class="form-group">
-                <label class="form-label">Estado (UF)</label>
-                <select id="authRegisterTrainerState" class="form-input">
-                  <option value="SP" selected>SP</option><option value="RJ">RJ</option><option value="MG">MG</option>
-                  <option value="RS">RS</option><option value="PR">PR</option><option value="SC">SC</option>
-                  <option value="BA">BA</option><option value="CE">CE</option><option value="PE">PE</option>
-                  <option value="DF">DF</option><option value="GO">GO</option><option value="ES">ES</option>
-                  <option value="PA">PA</option><option value="AM">AM</option><option value="MT">MT</option>
-                  <option value="MS">MS</option><option value="MA">MA</option><option value="PB">PB</option>
-                  <option value="RN">RN</option><option value="AL">AL</option><option value="PI">PI</option>
-                  <option value="SE">SE</option><option value="RO">RO</option><option value="TO">TO</option>
-                  <option value="AC">AC</option><option value="AP">AP</option><option value="RR">RR</option>
-                </select>
+                <label class="form-label">Nome Profissional (Como seus alunos verão) <span style="color: #ff5252;">*</span></label>
+                <input type="text" id="authRegisterProfName" class="form-input" placeholder="Ex: Prof. Carlos Silva">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">WhatsApp Profissional <span style="color: #ff5252;">*</span></label>
+                <input type="tel" id="authRegisterTrainerPhone" class="form-input" placeholder="(11) 98888-7777">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Bio Resumida / Apresentação</label>
+                <textarea id="authRegisterTrainerBio" class="form-input" rows="2" placeholder="Ex: Especialista em hipertrofia e prescrição personalizada..."></textarea>
               </div>
             </div>
 
-            <!-- Dados do CREF com aviso transparente de moderação -->
-            <div style="background: rgba(22, 26, 36, 0.95); border: 1px solid rgba(255,215,0,0.3); border-radius: 12px; padding: 12px; margin-bottom: 12px;">
-              <div style="font-size: 11px; font-weight: 800; color: #ffd700; text-transform: uppercase; margin-bottom: 8px;">
-                📜 Habilitação Profissional (CREF)
+            <!-- Etapa 3: Habilitação Profissional -->
+            <div style="background: rgba(22, 26, 36, 0.9); border: 1px solid rgba(255,215,0,0.3); border-radius: 12px; padding: 14px; margin-bottom: 12px;">
+              <div style="font-size: 11.5px; font-weight: 800; color: #ffd700; text-transform: uppercase; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                <span>3️⃣</span> Habilitação (CREF)
               </div>
               <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px;">
                 <div class="form-group" style="margin-bottom: 6px;">
@@ -1344,43 +1328,42 @@
                   </select>
                 </div>
               </div>
-              <div style="font-size: 10.5px; color: #ffd700; line-height: 1.4; margin-top: 4px;">
-                ℹ️ <em>O número de registro será cadastrado inicialmente com status <strong>"Em Análise"</strong> e passará por homologação da equipe TitanNova Fit. Você já poderá prescrever e vincular alunos normalmente.</em>
+
+              <div class="form-group" style="margin-top: 10px;">
+                <label class="form-label">Especialidades de Atuação</label>
+                <div id="trainerSpecialtiesChips" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px;">
+                  <label style="font-size: 11px; background: #222630; border: 1px solid var(--divider); padding: 5px 10px; border-radius: 20px; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                    <input type="checkbox" value="Musculação & Hipertrofia" checked> Musculação & Hipertrofia
+                  </label>
+                  <label style="font-size: 11px; background: #222630; border: 1px solid var(--divider); padding: 5px 10px; border-radius: 20px; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                    <input type="checkbox" value="Emagrecimento" checked> Emagrecimento
+                  </label>
+                  <label style="font-size: 11px; background: #222630; border: 1px solid var(--divider); padding: 5px 10px; border-radius: 20px; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                    <input type="checkbox" value="Treinamento Funcional"> Treinamento Funcional
+                  </label>
+                  <label style="font-size: 11px; background: #222630; border: 1px solid var(--divider); padding: 5px 10px; border-radius: 20px; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                    <input type="checkbox" value="Reabilitação & Postura"> Reabilitação & Postura
+                  </label>
+                </div>
               </div>
             </div>
 
-            <div class="form-group">
-              <label class="form-label">Especialidades de Atuação</label>
-              <div id="trainerSpecialtiesChips" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px;">
-                <label style="font-size: 11px; background: #222630; border: 1px solid var(--divider); padding: 5px 10px; border-radius: 20px; cursor: pointer; display: flex; align-items: center; gap: 4px;">
-                  <input type="checkbox" value="Musculação & Hipertrofia" checked> Musculação & Hipertrofia
-                </label>
-                <label style="font-size: 11px; background: #222630; border: 1px solid var(--divider); padding: 5px 10px; border-radius: 20px; cursor: pointer; display: flex; align-items: center; gap: 4px;">
-                  <input type="checkbox" value="Emagrecimento" checked> Emagrecimento
-                </label>
-                <label style="font-size: 11px; background: #222630; border: 1px solid var(--divider); padding: 5px 10px; border-radius: 20px; cursor: pointer; display: flex; align-items: center; gap: 4px;">
-                  <input type="checkbox" value="Treinamento Funcional"> Treinamento Funcional
-                </label>
-                <label style="font-size: 11px; background: #222630; border: 1px solid var(--divider); padding: 5px 10px; border-radius: 20px; cursor: pointer; display: flex; align-items: center; gap: 4px;">
-                  <input type="checkbox" value="Reabilitação & Postura"> Reabilitação & Postura
-                </label>
-                <label style="font-size: 11px; background: #222630; border: 1px solid var(--divider); padding: 5px 10px; border-radius: 20px; cursor: pointer; display: flex; align-items: center; gap: 4px;">
-                  <input type="checkbox" value="Performance Esportiva"> Performance Esportiva
+            <!-- Etapa 4: Status da Análise & Termo Técnico -->
+            <div style="background: rgba(255, 183, 77, 0.08); border: 1px solid rgba(255, 183, 77, 0.3); border-radius: 12px; padding: 14px; margin-bottom: 12px;">
+              <div style="font-size: 11.5px; font-weight: 800; color: #ffb74d; text-transform: uppercase; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                <span>4️⃣</span> Status da Análise & Moderação
+              </div>
+              <div style="font-size: 11.5px; color: #e0e0e0; line-height: 1.45; margin-bottom: 10px;">
+                O registro será cadastrado inicialmente com status <strong>"Em Análise"</strong>. A homologação do CREF será realizada pela equipe técnica TitanNova Fit antes da liberação de envio de convites e prescrição de alunos.
+              </div>
+
+              <!-- Declaração de Responsabilidade Técnica -->
+              <div style="display: flex; align-items: flex-start; gap: 10px; background: rgba(0,0,0,0.35); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
+                <input type="checkbox" id="authTrainerResponsibilityCheck" style="width: 18px; height: 18px; accent-color: #ffd700; cursor: pointer; flex-shrink: 0; margin-top: 2px;">
+                <label for="authTrainerResponsibilityCheck" style="font-size: 11.5px; color: #e0e0e0; line-height: 1.35; cursor: pointer;">
+                  Declaro ser profissional de Educação Física devidamente habilitado e assumo total <strong>responsabilidade técnica</strong> pelas fichas e orientações prescritas. <span style="color: #ff5252;">*</span>
                 </label>
               </div>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Bio Resumida / Apresentação</label>
-              <textarea id="authRegisterTrainerBio" class="form-input" rows="2" placeholder="Ex: Especialista em hipertrofia e prescrição personalizada..."></textarea>
-            </div>
-
-            <!-- Declaração de Responsabilidade Técnica -->
-            <div style="display: flex; align-items: flex-start; gap: 10px; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); margin-bottom: 12px;">
-              <input type="checkbox" id="authTrainerResponsibilityCheck" style="width: 18px; height: 18px; accent-color: #ffd700; cursor: pointer; flex-shrink: 0; margin-top: 2px;">
-              <label for="authTrainerResponsibilityCheck" style="font-size: 11px; color: #e0e0e0; line-height: 1.35; cursor: pointer;">
-                Declaro ser profissional de Educação Física devidamente habilitado e assumo total <strong>responsabilidade técnica</strong> pelas orientações e fichas prescritas aos alunos. <span style="color: #ff5252;">*</span>
-              </label>
             </div>
           </div>
 
@@ -1447,13 +1430,16 @@
           <p style="color: var(--text-grey); font-size: 13px; margin: 2px 0 0 0;">Bora superar seus limites hoje?</p>
         </div>
 
-        <!-- Hero Card Dinâmico -->
-        <div class="hero-card" id="homeHeroCard">
-          <span style="font-size: 10px; font-weight: 800; background: rgba(255,255,255,0.2); padding: 4px 8px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.5px;">TREINO RECOMENDADO HOJE</span>
-          <h2 id="homeHeroTitle" style="font-size: 22px; font-weight: 800; margin-top: 8px; color: white;">Treino A — Peito & Tríceps</h2>
-          <p id="homeHeroSubtitle" style="font-size: 12px; opacity: 0.9; margin-top: 4px;">5 exercícios • ~50 min de duração</p>
-          <button id="homeHeroBtn" onclick="startActiveWorkout('treino_default_a')" class="btn btn-success" style="margin-top: 16px; box-shadow: 0 4px 16px rgba(76,175,80,0.4);">
-            ▶ INICIAR TREINO AGORA
+        <!-- Hero Card Dinâmico: Ação Principal Dominante -->
+        <div class="hero-card" id="homeHeroCard" style="background: linear-gradient(135deg, #121824 0%, #1a2332 100%); border: 1.5px solid rgba(0, 210, 255, 0.3); border-radius: 16px; padding: 20px; margin-bottom: 16px; box-shadow: 0 6px 24px rgba(0,0,0,0.5);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-size: 10.5px; font-weight: 800; background: rgba(0,210,255,0.15); color: var(--accent-cyan); padding: 3px 8px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px;">PRÓXIMO TREINO</span>
+            <span style="font-size: 11px; color: var(--text-grey); font-weight: 600;">1 toque para iniciar</span>
+          </div>
+          <h2 id="homeHeroTitle" style="font-size: 22px; font-weight: 900; margin: 4px 0 2px 0; color: white;">Treino A — Peito e Tríceps</h2>
+          <p id="homeHeroSubtitle" style="font-size: 12.5px; color: var(--text-grey); margin: 0 0 16px 0;">5 exercícios · aproximadamente 50 minutos</p>
+          <button id="homeHeroBtn" onclick="startActiveWorkout('treino_default_a')" class="btn btn-success" style="width: 100%; padding: 14px 20px; font-size: 15px; font-weight: 900; letter-spacing: 0.5px; border-radius: 12px; background: linear-gradient(135deg, #2e7d32 0%, #43a047 100%); box-shadow: 0 4px 18px rgba(46,125,50,0.45); border: none; cursor: pointer;">
+            ▶ INICIAR TREINO
           </button>
         </div>
 
@@ -2038,9 +2024,20 @@
             </div>
             <p style="color: var(--text-grey); font-size: 12px; margin-top: 2px;">Prescrição e acompanhamento técnico</p>
           </div>
-          <button onclick="openTrainerInviteModal()" class="btn btn-primary" style="width: auto; padding: 8px 14px; font-size: 12px; font-weight: 800; border-radius: 10px; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(0,210,255,0.3);">
+          <button id="trainerInviteStudentBtn" onclick="openTrainerInviteModal()" class="btn btn-primary" style="width: auto; padding: 8px 14px; font-size: 12px; font-weight: 800; border-radius: 10px; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(0,210,255,0.3);">
             <span>➕</span> Convidar Aluno
           </button>
+        </div>
+
+        <!-- Banner de Homologação de CREF Pendente -->
+        <div id="trainerPendingNoticeCard" class="card" style="display: none; background: rgba(255, 183, 77, 0.12); border: 1px solid rgba(255, 183, 77, 0.4); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+          <div style="display: flex; align-items: flex-start; gap: 12px;">
+            <span style="font-size: 26px;">⏳</span>
+            <div>
+              <div style="font-size: 14px; font-weight: 800; color: #ffb74d; margin-bottom: 4px;">Cadastro profissional em análise</div>
+              <div style="font-size: 12px; color: #e0e0e0; line-height: 1.45;">Você já pode configurar seu perfil. Convites e prescrições serão liberados após a homologação do CREF pela equipe TitanNova Fit.</div>
+            </div>
+          </div>
         </div>
 
         <!-- Card de Cota de Alunos e Plano Ativo -->
@@ -5718,7 +5715,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       showSyncStatus(status);
     }
 
-    function showSyncStatus(status, retryFn = null) {
+    function showSyncStatus(status, retryFn = null, pendingCount = null) {
       const statusEl = document.getElementById('connectionStatus');
       if (!statusEl) return;
 
@@ -5751,23 +5748,28 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
 
       if (status === 'saved' || status === 'cloud_saved' || status === 'sync_complete') {
         statusEl.className = 'sync-pill-saved';
-        statusEl.innerHTML = '☁️ Salvo na nuvem';
+        statusEl.innerHTML = '☁️ Tudo sincronizado';
         statusEl.style.display = 'inline-flex';
         statusEl._savedTimeout = setTimeout(() => {
           statusEl.className = 'sync-pill-idle';
-          statusEl.innerHTML = '● Nuvem Conectada';
+          statusEl.innerHTML = navigator.onLine ? '● Tudo sincronizado' : '● Salvo neste dispositivo';
         }, 2500);
       } else if (status === 'error') {
         statusEl.className = 'sync-pill-error';
-        statusEl.innerHTML = '⚠️ Erro de sincronização <button class="sync-retry-btn" onclick="retryLastSyncAction(event)">Tentar</button>';
+        statusEl.innerHTML = '⚠️ Falha ao sincronizar — <button class="sync-retry-btn" onclick="retryLastSyncAction(event)">Tentar novamente</button>';
         statusEl.style.display = 'inline-flex';
-      } else if (status === 'pending_offline') {
+      } else if (status === 'pending_offline' || status === 'offline') {
         statusEl.className = 'sync-pill-pending';
-        statusEl.innerHTML = '● Modo Offline (Salvo local)';
+        const count = typeof pendingCount === 'number' ? pendingCount : 0;
+        if (count > 0) {
+          statusEl.innerHTML = `● ${count} alteraç${count > 1 ? 'ões' : 'ão'} aguardando sincronização`;
+        } else {
+          statusEl.innerHTML = '● Salvo neste dispositivo';
+        }
         statusEl.style.display = 'inline-flex';
       } else {
         statusEl.className = 'sync-pill-idle';
-        statusEl.innerHTML = '● Nuvem Conectada';
+        statusEl.innerHTML = navigator.onLine ? '● Tudo sincronizado' : '● Salvo neste dispositivo';
         statusEl.style.display = 'inline-flex';
       }
     }
@@ -5886,7 +5888,9 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
             localStorage.setItem(`titannovafit_queue_${userId}`, JSON.stringify(queue));
           } catch (_) {}
         }
-        showSyncStatus('pending_offline');
+        this.getPendingOperations(userId).then(ops => {
+          showSyncStatus('pending_offline', null, (ops?.length || 1));
+        }).catch(() => showSyncStatus('pending_offline'));
         console.log(`[Offline Queue] Operação pendente gravada: ${table} (${action}) para o atleta ${userId}`);
         this.scheduleAutoRetry(userId);
         setTimeout(() => this.flushQueue(userId), 300);
@@ -9582,25 +9586,20 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
           }
 
           rowsHtml += `
-            <div class="set-row" id="${rowId}" data-set-type="normal" style="margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-              <button type="button" class="set-type-badge btn-micro" onclick="cycleSetType('${rowId}')" title="Tipo: Normal (1,2), Aquecimento (A), Preparação (P), Drop set (D), Cronometrada (C)">
+            <div class="set-row" id="${rowId}" data-set-type="normal" style="margin-bottom: 6px; display: grid; grid-template-columns: 36px 74px 1fr 1fr 42px; gap: 6px; align-items: center;">
+              <button type="button" class="set-type-badge btn-micro" onclick="cycleSetType('${rowId}')" title="Tipo: Normal (1,2), Aquecimento (A), Drop set (D)" style="height: 36px; display: flex; align-items: center; justify-content: center; font-weight: 800; border-radius: 8px;">
                 ${s}
               </button>
-              <div style="width: 72px; text-align: center; font-size: 11px; color: var(--accent-cyan); font-weight: 700; background: rgba(0,210,255,0.06); padding: 4px 2px; border-radius: 6px;" title="Carga e repetições no treino anterior">
+              <div style="height: 36px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--accent-cyan); font-weight: 700; background: rgba(0,210,255,0.06); border-radius: 8px;" title="Carga e repetições no treino anterior">
                 ${prevText}
               </div>
-              <div style="flex: 1; display: flex; align-items: center; gap: 2px;">
-                <input type="number" step="0.5" class="form-input set-weight-input" value="${defaultWeight}" oninput="saveActiveSessionToStorage()" onchange="saveActiveSessionToStorage()" style="padding: 6px 4px; font-size: 12px; text-align: center;" placeholder="0">
-                <button type="button" class="btn-micro" onclick="quickAdjustWeight('${rowId}', 2.5)" style="padding: 3px 5px; font-size: 9.5px;" title="Adicionar 2.5kg">+2.5</button>
+              <div style="display: flex; align-items: center;">
+                <input type="number" step="0.5" class="form-input set-weight-input" value="${defaultWeight}" oninput="saveActiveSessionToStorage()" onchange="saveActiveSessionToStorage()" style="height: 36px; padding: 4px 6px; font-size: 13px; font-weight: 700; text-align: center; width: 100%; border-radius: 8px;" placeholder="0">
               </div>
-              <div style="flex: 1; display: flex; align-items: center; gap: 2px;">
-                <input type="number" class="form-input set-reps-input" value="${defaultReps}" oninput="saveActiveSessionToStorage()" onchange="saveActiveSessionToStorage()" style="padding: 6px 4px; font-size: 12px; text-align: center;" placeholder="10">
-                <button type="button" class="btn-micro" onclick="quickAdjustReps('${rowId}', 1)" style="padding: 3px 5px; font-size: 9.5px;" title="Adicionar 1 rep">+1</button>
+              <div style="display: flex; align-items: center;">
+                <input type="number" class="form-input set-reps-input" value="${defaultReps}" oninput="saveActiveSessionToStorage()" onchange="saveActiveSessionToStorage()" style="height: 36px; padding: 4px 6px; font-size: 13px; font-weight: 700; text-align: center; width: 100%; border-radius: 8px;" placeholder="10">
               </div>
-              <div style="width: 40px; display: flex; align-items: center;">
-                <input type="number" min="1" max="10" step="0.5" class="form-input set-rpe-input" value="" oninput="saveActiveSessionToStorage()" onchange="saveActiveSessionToStorage()" style="padding: 6px 2px; font-size: 11px; text-align: center;" placeholder="RPE" title="Esforço Percebido 1-10">
-              </div>
-              <div class="set-check" onclick="toggleSetDone('${rowId}', ${restDuration})">✓</div>
+              <div class="set-check" onclick="toggleSetDone('${rowId}', ${restDuration})" style="height: 36px; width: 100%; border-radius: 8px; font-size: 16px; font-weight: 900; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Concluir série">✓</div>
             </div>
           `;
         }
@@ -9637,13 +9636,12 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
             </div>
 
             <!-- Cabeçalho das Colunas de Séries -->
-            <div style="font-size: 10.5px; font-weight: 800; color: var(--text-grey); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; padding: 0 2px;">
-              <span style="width: 24px; text-align: center;">SET</span>
-              <span style="width: 68px; text-align: center; color: var(--accent-cyan);">ÚLTIMA</span>
-              <span style="flex: 1; text-align: center;">CARGA (KG)</span>
-              <span style="flex: 1; text-align: center;">REPETIÇÕES</span>
-              <span style="width: 40px; text-align: center;" title="Percepção Subjetiva de Esforço (1-10)">RPE</span>
-              <span style="width: 32px; text-align: center;">OK</span>
+            <div class="set-columns-header" style="font-size: 11px; font-weight: 800; color: var(--text-grey); margin-bottom: 8px; display: grid; grid-template-columns: 36px 74px 1fr 1fr 42px; gap: 6px; text-align: center; padding: 0 2px;">
+              <span>SÉRIE</span>
+              <span style="color: var(--accent-cyan);" title="Carga e repetições no treino anterior">ANTERIOR</span>
+              <span>CARGA (KG)</span>
+              <span>REPETIÇÕES</span>
+              <span>CONCLUIR</span>
             </div>
 
             <div class="set-rows-container">
@@ -9679,25 +9677,23 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       const defaultReps = lastRepsInput ? lastRepsInput.value : '10';
 
       const newRowHtml = `
-        <div class="set-row" id="${rowId}" data-set-type="normal" style="margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-          <button type="button" class="set-type-badge btn-micro" onclick="cycleSetType('${rowId}')" title="Tipo: Normal, Aquecimento (A), Preparação (P), Drop set (D), Cronometrada (C)">
+        <div class="set-row" id="${rowId}" data-set-type="normal" style="margin-bottom: 6px; display: grid; grid-template-columns: 36px 74px 1fr 1fr 42px; gap: 6px; align-items: center;">
+          <button type="button" class="set-type-badge btn-micro" onclick="cycleSetType('${rowId}')" title="Tipo: Normal, Aquecimento, Drop set" style="height: 36px; display: flex; align-items: center; justify-content: center; font-weight: 800; border-radius: 8px;">
             ${newSetNum}
           </button>
-          <div style="width: 72px; text-align: center; font-size: 11px; color: var(--text-grey);" class="prev-hint">—</div>
-          <div style="flex: 1; display: flex; align-items: center; gap: 2px;">
-            <input type="number" step="0.5" class="form-input set-weight-input" value="${defaultWeight}" oninput="saveActiveSessionToStorage()" onchange="saveActiveSessionToStorage()" style="padding: 6px 4px; font-size: 12px; text-align: center;" placeholder="0">
-            <button type="button" class="btn-micro" onclick="quickAdjustWeight('${rowId}', 2.5)" style="padding: 3px 5px; font-size: 9.5px;">+2.5</button>
+          <div style="height: 36px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--text-grey); background: rgba(255,255,255,0.03); border-radius: 8px;" class="prev-hint">—</div>
+          <div style="display: flex; align-items: center;">
+            <input type="number" step="0.5" class="form-input set-weight-input" value="${defaultWeight}" oninput="saveActiveSessionToStorage()" onchange="saveActiveSessionToStorage()" style="height: 36px; padding: 4px 6px; font-size: 13px; font-weight: 700; text-align: center; width: 100%; border-radius: 8px;" placeholder="0">
           </div>
-          <div style="flex: 1; display: flex; align-items: center; gap: 2px;">
-            <input type="number" class="form-input set-reps-input" value="${defaultReps}" oninput="saveActiveSessionToStorage()" onchange="saveActiveSessionToStorage()" style="padding: 6px 4px; font-size: 12px; text-align: center;" placeholder="10">
-            <button type="button" class="btn-micro" onclick="quickAdjustReps('${rowId}', 1)" style="padding: 3px 5px; font-size: 9.5px;">+1</button>
+          <div style="display: flex; align-items: center;">
+            <input type="number" class="form-input set-reps-input" value="${defaultReps}" oninput="saveActiveSessionToStorage()" onchange="saveActiveSessionToStorage()" style="height: 36px; padding: 4px 6px; font-size: 13px; font-weight: 700; text-align: center; width: 100%; border-radius: 8px;" placeholder="10">
           </div>
-          <div style="width: 40px; display: flex; align-items: center;">
-            <input type="number" min="1" max="10" step="0.5" class="form-input set-rpe-input" value="" oninput="saveActiveSessionToStorage()" onchange="saveActiveSessionToStorage()" style="padding: 6px 2px; font-size: 11px; text-align: center;" placeholder="RPE" title="Esforço Percebido 1-10">
-          </div>
-          <div class="set-check" onclick="toggleSetDone('${rowId}', 60)">✓</div>
+          <div class="set-check" onclick="toggleSetDone('${rowId}', 60)" style="height: 36px; width: 100%; border-radius: 8px; font-size: 16px; font-weight: 900; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Concluir série">✓</div>
         </div>
       `;
+      rowsContainer.insertAdjacentHTML('beforeend', newRowHtml);
+      saveActiveSessionToStorage();
+    }
       rowsContainer.insertAdjacentHTML('beforeend', newRowHtml);
       saveActiveSessionToStorage();
     }
@@ -10185,6 +10181,38 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
         }
         startRestTimer(restDuration || 60);
 
+        // Feedback imediato de sobrecarga progressiva (dopamina positiva ao concluir série)
+        try {
+          const weightInput = row.querySelector('.set-weight-input');
+          const repsInput = row.querySelector('.set-reps-input');
+          const curW = parseFloat(weightInput?.value || '0') || 0;
+          const curR = parseInt(repsInput?.value || '0', 10) || 0;
+
+          const card = row.closest('.active-exercise-card');
+          const exName = card?.dataset?.exName || '';
+          const lastPerf = typeof getLastExercisePerformance === 'function' ? getLastExercisePerformance(exName) : null;
+          const parts = rowId.split('_');
+          const setIdx = parts.length >= 3 ? (parseInt(parts[2], 10) - 1) : 0;
+
+          let feedbackMsg = '';
+          if (lastPerf && lastPerf[setIdx]) {
+            const prevW = lastPerf[setIdx].peso !== undefined ? lastPerf[setIdx].peso : (lastPerf[setIdx].peso_kg || 0);
+            const prevR = lastPerf[setIdx].reps !== undefined ? lastPerf[setIdx].reps : (lastPerf[setIdx].repeticoes || 0);
+
+            if (curW > prevW) {
+              const diffW = (curW - prevW).toFixed(1).replace('.0', '');
+              feedbackMsg = `+${diffW} kg de sobrecarga progressiva 💪`;
+            } else if (curW === prevW && curR > prevR) {
+              const diffR = curR - prevR;
+              feedbackMsg = `+${diffR} repetiç${diffR > 1 ? 'ões' : 'ão'} em relação ao treino anterior 🔥`;
+            }
+          }
+
+          if (feedbackMsg) {
+            showToastNotification(feedbackMsg);
+          }
+        } catch (_) {}
+
         // Auto-focus no próximo set pendente (Strong-like UX)
         try {
           const allRows = Array.from(document.querySelectorAll('#activeWorkoutExercisesContainer .set-row'));
@@ -10257,10 +10285,27 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
     }
 
     // ==========================================
-    // CRONÔMETRO DE DESCANSO PERSISTENTE
+    // CRONÔMETRO DE DESCANSO PERSISTENTE COM WAKELOCK
     // ==========================================
     let restTimerTargetTimestamp = null;
     let restTotalDuration = 60;
+    let _restWakeLockSentinel = null;
+
+    async function requestRestWakeLock() {
+      if ('wakeLock' in navigator && !_restWakeLockSentinel) {
+        try {
+          _restWakeLockSentinel = await navigator.wakeLock.request('screen');
+          _restWakeLockSentinel.addEventListener('release', () => { _restWakeLockSentinel = null; });
+        } catch (_) {}
+      }
+    }
+
+    function releaseRestWakeLock() {
+      if (_restWakeLockSentinel) {
+        try { _restWakeLockSentinel.release(); } catch (_) {}
+        _restWakeLockSentinel = null;
+      }
+    }
 
     function startRestTimer(seconds) {
       const duration = seconds || 60;
@@ -10269,8 +10314,12 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       restTimeRemaining = duration;
 
       const restBar = document.getElementById('restTimerBar');
-      if (restBar) restBar.classList.add('active');
+      if (restBar) {
+        restBar.classList.remove('finished-pulse');
+        restBar.classList.add('active');
+      }
       updateRestUI();
+      requestRestWakeLock();
 
       clearInterval(restTimerInterval);
       restTimerInterval = setInterval(() => {
@@ -10280,6 +10329,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
 
         if (remaining <= 0) {
           clearInterval(restTimerInterval);
+          releaseRestWakeLock();
           playAudioBeep();
           if ('vibrate' in navigator) {
             try { navigator.vibrate([200, 100, 200, 100, 300]); } catch (_) {}
@@ -10293,7 +10343,13 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
             } catch (_) {}
           }
           showToastNotification('🔔 Tempo de Descanso Concluído! Inicie sua próxima série.');
-          if (restBar) restBar.classList.remove('active');
+          if (restBar) {
+            restBar.classList.add('finished-pulse');
+            setTimeout(() => {
+              restBar.classList.remove('finished-pulse');
+              restBar.classList.remove('active');
+            }, 1800);
+          }
         }
       }, 500);
     }
@@ -10320,9 +10376,13 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
 
     function skipRestTimer() {
       clearInterval(restTimerInterval);
+      releaseRestWakeLock();
       restTimerTargetTimestamp = null;
       const restBar = document.getElementById('restTimerBar');
-      if (restBar) restBar.classList.remove('active');
+      if (restBar) {
+        restBar.classList.remove('finished-pulse');
+        restBar.classList.remove('active');
+      }
     }
 
     function playAudioBeep() {
@@ -12117,7 +12177,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
 
       // Estado padrão: sugerir próximo treino da sequência
       heroBtnEl.className = 'btn btn-success';
-      heroBtnEl.innerHTML = '▶ INICIAR TREINO AGORA';
+      heroBtnEl.innerHTML = '▶ INICIAR TREINO';
 
       const workouts = (Array.isArray(allWorkoutsList) && allWorkoutsList.length > 0) ? allWorkoutsList : DEFAULT_WORKOUT_DIVISIONS;
       if (!workouts || workouts.length === 0) return;
@@ -12137,7 +12197,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
 
       heroTitleEl.innerText = recommended.nome || 'Treino Recomendado';
       if (heroSubtitleEl) {
-        heroSubtitleEl.innerText = `${numEx} exercícios • ~${estimatedDuration} min de duração`;
+        heroSubtitleEl.innerText = `${numEx} exercícios · aproximadamente ${estimatedDuration} minutos`;
       }
 
       const safeWorkoutParam = (recommended.id || recommended.nome).replace(/'/g, "\\'");
@@ -14042,36 +14102,74 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
     window.addEventListener('load', async () => {
       const continueOfflineBtn = document.getElementById('appContinueOfflineBtn');
       const sessionErrorBox = document.getElementById('appSessionErrorBox');
+      const statusEl = document.getElementById('appInitialLoadingStatus');
 
-      // Proteção de timeout absoluto de 8 segundos
+      // 1. Verificação instantânea de usuário/token prévio no localStorage
+      const cachedUserRaw = localStorage.getItem('titannovafit_user');
+      let parsedCachedUser = null;
+      if (cachedUserRaw) {
+        try { parsedCachedUser = JSON.parse(cachedUserRaw); } catch (_) { parsedCachedUser = null; }
+      }
+      const hasSupabaseToken = Object.keys(localStorage).some(k => k.includes('-auth-token'));
+
+      // Se é um visitante novo (sem sessão nem token salvo), direciona imediatamente para auth (<50ms)
+      if (!parsedCachedUser && !hasSupabaseToken) {
+        console.log("[BOOT 1] Novo visitante sem sessão salva. Transição imediata para login/cadastro.");
+        setAuthStatus('unauthenticated');
+        loadExercisesLibrary().catch(err => console.error("[AUTH ERROR] loadExercisesLibrary:", err));
+        return;
+      }
+
+      // Se há sessão prévia, informar de forma amigável
+      if (statusEl) {
+        statusEl.innerText = !navigator.onLine 
+          ? 'Você está offline — seus dados locais estão seguros'
+          : 'Restaurando sua sessão...';
+      }
+
+      // Se está offline mas tem usuário em cache, restaura offline imediatamente
+      if (!navigator.onLine && parsedCachedUser) {
+        console.log("[BOOT 2] Inicializando em modo offline seguro com dados locais.");
+        setAuthStatus('authenticated', parsedCachedUser);
+        loadWorkoutsFromStorage(true);
+        loadHistoryFromStorage(true);
+        loadExercisesLibrary().catch(err => console.error("[AUTH ERROR] loadExercisesLibrary:", err));
+        return;
+      }
+
+      // Proteção de timeout de 6 segundos para conexões lentas
       const bootSafetyTimeout = setTimeout(() => {
         if (!isSplashScreenRemoved) {
-          console.error("[AUTH ERROR] Timeout de 8 segundos excedido ao verificar sessão no Supabase. Destravando aplicação...");
-          setAuthStatus(currentAuthUser ? 'authenticated' : 'unauthenticated', currentAuthUser);
+          console.warn("[AUTH] Timeout ao verificar sessão na nuvem. Entrando com dados locais ou login...");
+          if (parsedCachedUser) {
+            setAuthStatus('authenticated', parsedCachedUser);
+            loadWorkoutsFromStorage(true);
+            loadHistoryFromStorage(true);
+          } else {
+            setAuthStatus('unauthenticated');
+          }
         }
-      }, 8000);
+      }, 6000);
 
       try {
-        console.log("[BOOT 3] Iniciando getSession");
+        console.log("[BOOT 3] Verificando sessão no Supabase");
         let session = null;
 
         if (_supabase) {
           try {
-            // Timeout individual de 7.5 segundos para getSession
             const sessionPromise = _supabase.auth.getSession();
             const timeoutPromise = new Promise((_, reject) =>
-              setTimeout(() => reject(new Error("Timeout na chamada de getSession")), 7500)
+              setTimeout(() => reject(new Error("Timeout na chamada de getSession")), 4500)
             );
             const { data, error: sessionError } = await Promise.race([sessionPromise, timeoutPromise]);
-            console.log("[BOOT 4] getSession respondeu");
 
             if (sessionError) {
-              console.error("[AUTH ERROR] Erro ao recuperar sessão:", sessionError);
+              console.warn("[AUTH] Erro ao recuperar sessão Supabase:", sessionError);
             } else if (data && data.session) {
               session = data.session;
             }
           } catch (err) {
-            console.error("[AUTH ERROR] Exceção em getSession:", err);
+            console.warn("[AUTH] getSession indisponível ou timeout:", err);
           }
 
           // Monitorar mudanças contínuas de autenticação
@@ -14099,14 +14197,12 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
           } catch (authListenerErr) {
             console.error("[AUTH ERROR] onAuthStateChange listener error:", authListenerErr);
           }
-        } else {
-          console.error("[AUTH ERROR] Supabase client indisponível");
         }
 
-        console.log("[BOOT 5] Sessão:", !!session);
+        clearTimeout(bootSafetyTimeout);
 
         if (session && session.user) {
-          console.log("[BOOT 6] Iniciando carregamento do perfil");
+          console.log("[BOOT 4] Sessão restaurada com sucesso");
           currentAuthUser = session.user;
           localStorage.setItem('titannovafit_user', JSON.stringify({
             id: session.user.id,
@@ -14114,57 +14210,27 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
             nome: (session.user.user_metadata && session.user.user_metadata.nome) || session.user.email.split('@')[0]
           }));
 
-          clearTimeout(bootSafetyTimeout);
           setAuthStatus('authenticated', session.user);
 
           // Carga secundária assíncrona em background (NÃO bloqueia o app)
           (async () => {
-            try {
-              await checkAdminPermission(session.user.id);
-            } catch (err) {
-              console.error("[AUTH ERROR] checkAdminPermission:", err);
-            }
-            try {
-              await carregarDadosDoUsuario(session.user.id);
-            } catch (err) {
-              console.error("[AUTH ERROR] carregarDadosDoUsuario:", err);
-            }
-            try {
-              restoreActiveSessionFromStorage();
-              updateHomeScreenUI();
-            } catch (err) {
-              console.error("[AUTH ERROR] restoreActiveSession:", err);
-            }
+            try { await checkAdminPermission(session.user.id); } catch (_) {}
+            try { await carregarDadosDoUsuario(session.user.id); } catch (_) {}
+            try { restoreActiveSessionFromStorage(); updateHomeScreenUI(); } catch (_) {}
             try {
               const hasAccepted = await checkUserLegalAcceptance(session.user.id);
               if (!hasAccepted) openMandatoryLegalModal();
-            } catch (err) {
-              console.error("[AUTH ERROR] checkUserLegalAcceptance:", err);
-            }
+            } catch (_) {}
           })();
 
+        } else if (parsedCachedUser) {
+          console.log("[BOOT 5] Sessão nuvem expirada/indisponível. Restaurando usuário local.");
+          setAuthStatus('authenticated', parsedCachedUser);
+          loadWorkoutsFromStorage(true);
+          loadHistoryFromStorage(true);
         } else {
-          // Sessão Supabase não encontrada: verificar se há usuário salvo localmente (modo offline)
-          const cachedUser = localStorage.getItem('titannovafit_user');
-          let parsedCachedUser = null;
-          if (cachedUser) {
-            try {
-              parsedCachedUser = JSON.parse(cachedUser);
-            } catch (_) {
-              parsedCachedUser = null;
-            }
-          }
-
-          console.log("[BOOT 8] Auth finalizado");
-          clearTimeout(bootSafetyTimeout);
-
-          if (parsedCachedUser) {
-            setAuthStatus('authenticated', parsedCachedUser);
-            loadWorkoutsFromStorage(true);
-            loadHistoryFromStorage(true);
-          } else {
-            setAuthStatus('unauthenticated');
-          }
+          console.log("[BOOT 6] Nenhuma sessão ativa. Exibindo tela de autenticação.");
+          setAuthStatus('unauthenticated');
         }
 
         // Carregar catálogo de exercícios em background sem travar
@@ -14448,6 +14514,19 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
         const container = document.getElementById('trainerStudentsListContainer');
         if (!container) return;
 
+        const isApproved = (currentUserProfile?.account_type === 'admin') || (currentTrainerProfile && currentTrainerProfile.verification_status === 'approved');
+        const pendingBanner = document.getElementById('trainerPendingNoticeCard');
+        if (pendingBanner) {
+          pendingBanner.style.display = isApproved ? 'none' : 'block';
+        }
+        const inviteBtn = document.getElementById('trainerInviteStudentBtn');
+        if (inviteBtn) {
+          inviteBtn.disabled = !isApproved;
+          inviteBtn.style.opacity = isApproved ? '1' : '0.5';
+          inviteBtn.style.cursor = isApproved ? 'pointer' : 'not-allowed';
+          inviteBtn.title = isApproved ? 'Convidar novo aluno' : 'Disponível após homologação do CREF';
+        }
+
         const tab = this.currentStudentsTab;
 
         if (tab === 'active') {
@@ -14458,7 +14537,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
                 <div style="font-size: 38px; margin-bottom: 8px;">👥</div>
                 <h4 style="font-size: 15px; font-weight: 800; color: white; margin-bottom: 4px;">Nenhum aluno ativo no momento</h4>
                 <p style="font-size: 12px; color: var(--text-grey); margin-bottom: 16px;">Convide seus alunos enviando o link exclusivo direto pelo WhatsApp.</p>
-                <button onclick="openTrainerInviteModal()" class="btn btn-primary" style="padding: 10px 18px; font-size: 12px; font-weight: 800; width: auto; margin: 0 auto;">
+                <button onclick="openTrainerInviteModal()" class="btn btn-primary" ${!isApproved ? 'disabled style="padding: 10px 18px; font-size: 12px; font-weight: 800; width: auto; margin: 0 auto; opacity: 0.5; cursor: not-allowed;" title="Disponível após homologação do CREF"' : 'style="padding: 10px 18px; font-size: 12px; font-weight: 800; width: auto; margin: 0 auto;"'}>
                   📲 Convidar Primeiro Aluno
                 </button>
               </div>
@@ -14494,9 +14573,15 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
                 </div>
 
                 <div style="display: flex; gap: 8px;">
-                  <button data-athlete-id="${escapeHtml(rel.athlete_id)}" data-athlete-name="${escapeHtml(name)}" onclick="openAssignWorkoutModal(this.dataset.athleteId, this.dataset.athleteName)" class="btn btn-primary" style="flex: 2; padding: 8px 10px; font-size: 11.5px; font-weight: 800;">
-                    📋 Prescrever Treino
-                  </button>
+                  ${isApproved ? `
+                    <button data-athlete-id="${escapeHtml(rel.athlete_id)}" data-athlete-name="${escapeHtml(name)}" onclick="openAssignWorkoutModal(this.dataset.athleteId, this.dataset.athleteName)" class="btn btn-primary" style="flex: 2; padding: 8px 10px; font-size: 11.5px; font-weight: 800;">
+                      📋 Prescrever Treino
+                    </button>
+                  ` : `
+                    <button type="button" disabled class="btn btn-primary" style="flex: 2; padding: 8px 10px; font-size: 11.5px; font-weight: 800; opacity: 0.5; cursor: not-allowed;" title="Prescrição liberada após homologação do CREF">
+                      🔒 Prescrição Bloqueada (CREF em análise)
+                    </button>
+                  `}
                   <button data-athlete-id="${escapeHtml(rel.athlete_id)}" data-athlete-name="${escapeHtml(name)}" onclick="TrainerModule.removeStudent(this.dataset.athleteId, this.dataset.athleteName)" class="btn btn-outline" style="flex: 1; padding: 8px 10px; font-size: 11px; border-color: rgba(255,82,82,0.4); color: #ff5252;">
                     Desvincular
                   </button>

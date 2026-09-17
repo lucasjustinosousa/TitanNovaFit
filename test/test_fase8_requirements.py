@@ -279,6 +279,112 @@ class TestWorkoutScreenStability(unittest.TestCase):
         self.assertIn("function runWorkoutSyncOnce(task)", self.app_html)
 
 
+class TestUXSimplificationAndPWAOptimizations(unittest.TestCase):
+    """Validação da reformulação da Landing Page e Otimização do PWA (Fase 8 - UX & Hardening)"""
+
+    @classmethod
+    def setUpClass(cls):
+        index_html_path = os.path.join(ROOT_DIR, "index.html")
+        with open(index_html_path, "r", encoding="utf-8") as f:
+            cls.index_html = f.read()
+
+        app_html_path = os.path.join(ROOT_DIR, "app.html")
+        with open(app_html_path, "r", encoding="utf-8") as f:
+            cls.app_html = f.read()
+
+    def test_landing_page_transparency_and_freemium(self):
+        """Valida que a promessa contraditória '100% Gratuito' foi removida e substituída pelo freemium honesto"""
+        self.assertNotIn("100% Gratuito", self.index_html, "A promessa contraditória 100% Gratuito não deve existir")
+        self.assertIn("Comece gratuitamente", self.index_html, "A chamada transparente deve ser Comece gratuitamente")
+        self.assertIn("Evolua sua carga.", self.index_html)
+        self.assertIn("Acompanhe seus resultados.", self.index_html)
+        self.assertIn("Monte seu treino, registre séries e visualize sua evolução.", self.index_html)
+
+    def test_landing_page_privacy_and_clean_faq(self):
+        """Valida remoção de termos absolutos de privacidade e jargões técnicos do FAQ"""
+        self.assertNotIn("Privacidade Absoluta", self.index_html)
+        self.assertNotIn("Conformidade Integral com a LGPD", self.index_html)
+        self.assertNotIn("targetEndTime", self.index_html, "Jargão técnico targetEndTime deve ser removido do FAQ")
+        self.assertIn("Proteção de dados desde o desenvolvimento", self.index_html)
+        self.assertIn("Recursos de privacidade alinhados à LGPD", self.index_html)
+
+    def test_landing_page_showcase_mockups(self):
+        """Valida a presença das 3 fases de demonstração real na vitrine da landing page"""
+        self.assertIn("Criação da Ficha", self.index_html)
+        self.assertIn("Registro de Série", self.index_html)
+        self.assertIn("Tela de Evolução", self.index_html)
+        self.assertIn("+2 repetições em relação ao treino anterior 🔥", self.index_html)
+
+    def test_pwa_boot_machine_states(self):
+        """Valida máquina de estados de boot amigável sem falsos erros para novos visitantes"""
+        self.assertIn("Carregando TitanNova Fit...", self.app_html)
+        self.assertNotIn("Não foi possível verificar sua sessão. Verifique sua conexão e tente novamente.", self.app_html)
+        self.assertIn("Novo visitante sem sessão salva. Transição imediata para login/cadastro.", self.app_html)
+
+    def test_athlete_simplified_registration(self):
+        """Valida cadastro simplificado do atleta com nascimento e LGPD sem barreiras extras"""
+        self.assertIn("CAMPOS ESPECÍFICOS DO ATLETA (CADASTRO SIMPLIFICADO)", self.app_html)
+        self.assertIn('id="authRegisterBirthDate"', self.app_html)
+        self.assertIn('id="authAgeCheck"', self.app_html)
+        self.assertIn('id="authTermsCheck"', self.app_html)
+        self.assertIn('id="authPrivacyCheck"', self.app_html)
+
+    def test_trainer_registration_4_stages(self):
+        """Valida cadastro de personal trainer estruturado em etapas claras com aviso de análise de CREF"""
+        self.assertIn("CAMPOS ESPECÍFICOS DO PERSONAL TRAINER (ESTRUTURADO EM 4 ETAPAS)", self.app_html)
+        self.assertIn("2️⃣</span> Perfil Profissional", self.app_html)
+        self.assertIn("3️⃣</span> Habilitação (CREF)", self.app_html)
+        self.assertIn("4️⃣</span> Status da Análise & Moderação", self.app_html)
+        self.assertIn('id="authTrainerResponsibilityCheck"', self.app_html)
+
+    def test_cref_pending_visual_and_technical_block(self):
+        """Valida bloqueio visual (banner) e técnico para CREF pendente na gestão de alunos"""
+        self.assertIn('id="trainerPendingNoticeCard"', self.app_html)
+        self.assertIn("Cadastro profissional em análise", self.app_html)
+        self.assertIn('id="trainerInviteStudentBtn"', self.app_html)
+        self.assertIn("🔒 Prescrição Bloqueada (CREF em análise)", self.app_html)
+
+    def test_home_dominant_start_workout_action(self):
+        """Valida que o próximo treino domina a home com 1 toque para iniciar"""
+        self.assertIn('id="homeHeroCard"', self.app_html)
+        self.assertIn("PRÓXIMO TREINO", self.app_html)
+        self.assertIn("▶ INICIAR TREINO", self.app_html)
+        self.assertIn("aproximadamente", self.app_html)
+
+    def test_series_table_5_columns_and_overload_feedback(self):
+        """Valida tabela enxuta de 5 colunas de séries e feedback instantâneo de sobrecarga"""
+        self.assertIn("set-columns-header", self.app_html)
+        self.assertIn("ANTERIOR", self.app_html)
+        self.assertIn("CARGA (KG)", self.app_html)
+        self.assertIn("REPETIÇÕES", self.app_html)
+        self.assertIn("CONCLUIR", self.app_html)
+        self.assertIn("kg de sobrecarga progressiva 💪", self.app_html)
+        self.assertIn("em relação ao treino anterior 🔥", self.app_html)
+
+    def test_rest_timer_controls_and_wakelock(self):
+        """Valida cronômetro de descanso com botões diretos, wakeLock e pulso de finalização"""
+        self.assertIn("requestRestWakeLock()", self.app_html)
+        self.assertIn("releaseRestWakeLock()", self.app_html)
+        self.assertIn("finished-pulse", self.app_html)
+        self.assertIn("restPulseAlert", self.app_html)
+        self.assertIn("Encerrar", self.app_html)
+        self.assertIn("+15s", self.app_html)
+        self.assertIn("+30s", self.app_html)
+
+    def test_sync_status_honest_messaging(self):
+        """Valida mensagens realistas e honestas no pill de sincronização"""
+        self.assertIn("Salvo neste dispositivo", self.app_html)
+        self.assertIn("aguardando sincroniza", self.app_html)
+        self.assertIn("Tudo sincronizado", self.app_html)
+        self.assertIn("Falha ao sincronizar —", self.app_html)
+
+    def test_role_based_navigation_strict_isolation(self):
+        """Valida separação estrita da barra de navegação por papel"""
+        self.assertIn("updateBottomNavForRole()", self.app_html)
+        self.assertIn("PlanProvider.isAdmin", self.app_html)
+        self.assertIn("mode === 'trainer'", self.app_html)
+
+
 if __name__ == "__main__":
     unittest.main()
 
