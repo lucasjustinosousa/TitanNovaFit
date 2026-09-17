@@ -7,7 +7,7 @@ echo ========================================================
 echo.
 
 set MSG=%~1
-if "%MSG%"=="" set MSG=feat: pop-up expansivo de GIF com zoom 3D e atualizacoes no app
+if "%MSG%"=="" set MSG=chore: atualizacoes e sincronizacao automatica do TitanNova Fit
 
 echo [1/3] Adicionando arquivos modificados (git add)...
 git add .
