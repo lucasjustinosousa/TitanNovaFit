@@ -175,5 +175,110 @@ class TestArchitectureDocumentation(unittest.TestCase):
             self.assertIn("Modularização Progressiva", content)
 
 
+class TestWorkoutScreenStability(unittest.TestCase):
+    """Validações para estabilização visual da tela Divisões de Treino (Fase de Estabilização e Anti-Flicker)"""
+
+    @classmethod
+    def setUpClass(cls):
+        app_html_path = os.path.join(ROOT_DIR, "app.html")
+        with open(app_html_path, "r", encoding="utf-8") as f:
+            cls.app_html = f.read()
+
+    def test_fingerprint_determinism_and_insensitivity_to_order(self):
+        """Valida que o algoritmo de fingerprinting é determinístico e imune à ordem de lista"""
+        import json
+
+        def normalize(w):
+            if not w: return None
+            exs = w.get("exercicios") if isinstance(w.get("exercicios"), list) else []
+            days = sorted(w.get("diasSemana", [])) if isinstance(w.get("diasSemana"), list) else []
+            return {
+                "id": str(w.get("id") or ""),
+                "nome": str(w.get("nome") or "").strip(),
+                "descricao": str(w.get("descricao") or "").strip(),
+                "diasSemana": days,
+                "corHex": str(w.get("corHex") or "").strip(),
+                "updatedAt": str(w.get("updated_at") or w.get("atualizado_em") or w.get("criadoEm") or ""),
+                "exercicios": [
+                    {
+                        "id": str(e.get("id") or e.get("exercise_id") or idx),
+                        "nome": str(e.get("nome") or e.get("name") or "").strip(),
+                        "series": str(e.get("series") or ""),
+                        "reps": str(e.get("reps") or ""),
+                        "descanso": int(e.get("descanso") or 0)
+                    }
+                    for idx, e in enumerate(exs)
+                ]
+            }
+
+        def fingerprint(wl):
+            norm = [normalize(w) for w in wl]
+            norm = [w for w in norm if w is not None]
+            norm.sort(key=lambda x: x["id"])
+            return json.dumps(norm, sort_keys=True)
+
+        w1 = {"id": "w1", "nome": "Peito", "diasSemana": ["Segunda", "Quinta"], "corHex": "#ff0000", "exercicios": [{"id": "e1", "nome": "Supino", "series": "4", "reps": "10", "descanso": 60}]}
+        w2 = {"id": "w2", "nome": "Costas", "diasSemana": ["Terça", "Sexta"], "corHex": "#00ff00", "exercicios": [{"id": "e2", "nome": "Puxada", "series": "3", "reps": "12", "descanso": 45}]}
+
+        fp_a = fingerprint([w1, w2])
+        fp_b = fingerprint([w2, w1])
+        self.assertEqual(fp_a, fp_b, "Fingerprint deve ser idêntico independente da ordem dos treinos")
+
+        # Modificação de um parâmetro deve alterar o fingerprint
+        w1_mod = {**w1, "nome": "Peito e Tríceps"}
+        fp_mod = fingerprint([w1_mod, w2])
+        self.assertNotEqual(fp_a, fp_mod, "Fingerprint deve mudar se o nome de um treino for modificado")
+
+    def test_fingerprint_functions_exported_in_html(self):
+        """Verifica funções essenciais de fingerprinting exportadas"""
+        self.assertIn("function normalizeWorkoutForComparison(", self.app_html)
+        self.assertIn("function createWorkoutsFingerprint(", self.app_html)
+        self.assertIn("window.normalizeWorkoutForComparison = normalizeWorkoutForComparison;", self.app_html)
+        self.assertIn("window.createWorkoutsFingerprint = createWorkoutsFingerprint;", self.app_html)
+
+    def test_surgical_dom_patching_present(self):
+        """Verifica se patchWorkoutCards faz atualização cirúrgica por data-workout-id"""
+        self.assertIn("function patchWorkoutCards(nextWorkouts)", self.app_html)
+        self.assertIn("container.querySelectorAll('[data-workout-id]')", self.app_html)
+        self.assertIn("existingCard.innerHTML !== cardHtml", self.app_html)
+        self.assertIn("function renderAllWorkoutsUI()", self.app_html)
+        self.assertIn("patchWorkoutCards(allWorkoutsList)", self.app_html)
+
+    def test_no_inline_fade_in_animation_on_workout_cards(self):
+        """Verifica que o HTML do cartão não possui animation: fadeIn inline e usa classe .is-new"""
+        self.assertIn("function generateWorkoutCardHtml(", self.app_html)
+        gen_start = self.app_html.find("function generateWorkoutCardHtml(")
+        gen_end = self.app_html.find("function patchWorkoutCards(")
+        gen_func = self.app_html[gen_start:gen_end]
+        # Não pode ter inline animation: fadeIn no gerador de HTML do cartão
+        self.assertNotIn("animation: fadeIn", gen_func)
+        self.assertNotIn("animation:fadeIn", gen_func)
+
+        # patchWorkoutCards também não deve adicionar inline animation: fadeIn
+        patch_end = self.app_html.find("function renderAllWorkoutsUI(")
+        patch_func = self.app_html[gen_end:patch_end]
+        self.assertNotIn("animation: fadeIn", patch_func)
+
+        # Deve possuir regra CSS .workout-card.is-new e prefers-reduced-motion
+        self.assertIn(".workout-card.is-new", self.app_html)
+        self.assertIn("@media (prefers-reduced-motion: reduce)", self.app_html)
+
+    def test_connection_status_pill_width_stabilized(self):
+        """Verifica estilização estável do pill #connectionStatus"""
+        self.assertIn("#connectionStatus", self.app_html)
+        self.assertIn("min-width: 130px;", self.app_html)
+        self.assertIn("beginBackgroundSync()", self.app_html)
+        self.assertIn("finishBackgroundSync(", self.app_html)
+
+    def test_realtime_single_channel_guard_and_cleanup(self):
+        """Verifica guarda contra recriação desnecessária de canal e funções de cleanup"""
+        self.assertIn("_realtimeSyncChannel && _realtimeSyncUserId === uid", self.app_html)
+        self.assertIn("function scheduleRealtimeWorkoutRefresh()", self.app_html)
+        self.assertIn("function cleanupRealtimeSync()", self.app_html)
+        self.assertIn("await cleanupRealtimeSync();", self.app_html)
+        self.assertIn("function runWorkoutSyncOnce(task)", self.app_html)
+
+
 if __name__ == "__main__":
     unittest.main()
+

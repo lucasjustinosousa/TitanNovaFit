@@ -668,6 +668,37 @@
       font-weight: 700;
     }
 
+    #connectionStatus {
+      min-width: 130px;
+      justify-content: center;
+      text-align: center;
+      box-sizing: border-box;
+    }
+
+    /* Animação suave e controlada para novos cartões de treino (Etapa 7) */
+    .workout-card {
+      opacity: 1;
+      transform: none;
+    }
+    .workout-card.is-new {
+      animation: workoutCardEnter 0.2s ease-out;
+    }
+    @keyframes workoutCardEnter {
+      from {
+        opacity: 0;
+        transform: translateY(4px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .workout-card.is-new {
+        animation: none;
+      }
+    }
+
     .btn-micro {
       background: rgba(255, 255, 255, 0.07);
       border: 1px solid rgba(255, 255, 255, 0.15);
@@ -5673,6 +5704,19 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
     // MOTOR DE ESTADOS VISUAIS DE SINCRONIZAÇÃO
     // ==========================================
     let _lastFailedSyncAction = null;
+    let _syncIndicatorTimer = null;
+
+    function beginBackgroundSync() {
+      clearTimeout(_syncIndicatorTimer);
+      _syncIndicatorTimer = setTimeout(() => {
+        showSyncStatus('syncing');
+      }, 500);
+    }
+
+    function finishBackgroundSync(status = 'cloud_saved') {
+      clearTimeout(_syncIndicatorTimer);
+      showSyncStatus(status);
+    }
 
     function showSyncStatus(status, retryFn = null) {
       const statusEl = document.getElementById('connectionStatus');
@@ -5692,23 +5736,20 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
         statusEl._savedTimeout = null;
       }
 
-      if (status === 'saving') {
-        statusEl.className = 'sync-pill-saving';
-        statusEl.innerHTML = '<span class="sync-spinner">🔄</span> Salvando...';
-        statusEl.style.display = 'inline-flex';
-      } else if (status === 'saved' || status === 'cloud_saved') {
-        statusEl.className = 'sync-pill-saved';
-        statusEl.innerHTML = '☁️ Salvo na nuvem';
-        statusEl.style.display = 'inline-flex';
-        statusEl._savedTimeout = setTimeout(() => {
-          statusEl.className = 'sync-pill-idle';
-          statusEl.innerHTML = '● Nuvem Conectada';
-        }, 3500);
-      } else if (status === 'syncing') {
-        statusEl.className = 'sync-pill-saving';
-        statusEl.innerHTML = '<span class="sync-spinner">🔄</span> Sincronizando...';
-        statusEl.style.display = 'inline-flex';
-      } else if (status === 'sync_complete') {
+      // Sincronização em background: debounce de 500ms para evitar flickering em consultas rápidas
+      if (status === 'saving' || status === 'syncing') {
+        clearTimeout(_syncIndicatorTimer);
+        _syncIndicatorTimer = setTimeout(() => {
+          statusEl.className = 'sync-pill-saving';
+          statusEl.innerHTML = '<span class="sync-spinner">🔄</span> Sincronizando...';
+          statusEl.style.display = 'inline-flex';
+        }, 500);
+        return;
+      }
+
+      clearTimeout(_syncIndicatorTimer);
+
+      if (status === 'saved' || status === 'cloud_saved' || status === 'sync_complete') {
         statusEl.className = 'sync-pill-saved';
         statusEl.innerHTML = '☁️ Salvo na nuvem';
         statusEl.style.display = 'inline-flex';
@@ -5716,8 +5757,15 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
           statusEl.className = 'sync-pill-idle';
           statusEl.innerHTML = '● Nuvem Conectada';
         }, 2500);
+      } else if (status === 'error') {
+        statusEl.className = 'sync-pill-error';
+        statusEl.innerHTML = '⚠️ Erro de sincronização <button class="sync-retry-btn" onclick="retryLastSyncAction(event)">Tentar</button>';
+        statusEl.style.display = 'inline-flex';
+      } else if (status === 'pending_offline') {
+        statusEl.className = 'sync-pill-pending';
+        statusEl.innerHTML = '● Modo Offline (Salvo local)';
+        statusEl.style.display = 'inline-flex';
       } else {
-        // Modo silencioso contínuo: exibe Nuvem Conectada normalmente sem alarmar o usuário
         statusEl.className = 'sync-pill-idle';
         statusEl.innerHTML = '● Nuvem Conectada';
         statusEl.style.display = 'inline-flex';
@@ -7395,11 +7443,8 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
             await _supabase.auth.signOut({ scope: 'local' });
           } catch (_) {}
         }
-        if (_realtimeSyncChannel && _supabase) {
-          try {
-            _supabase.removeChannel(_realtimeSyncChannel);
-            _realtimeSyncChannel = null;
-          } catch (_) {}
+        if (typeof cleanupRealtimeSync === 'function') {
+          await cleanupRealtimeSync();
         }
         currentAuthUser = null;
         isCurrentSessionAdmin = false;
@@ -7426,11 +7471,8 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
             await _supabase.auth.signOut({ scope: 'global' });
           } catch (_) {}
         }
-        if (_realtimeSyncChannel && _supabase) {
-          try {
-            _supabase.removeChannel(_realtimeSyncChannel);
-            _realtimeSyncChannel = null;
-          } catch (_) {}
+        if (typeof cleanupRealtimeSync === 'function') {
+          await cleanupRealtimeSync();
         }
         currentAuthUser = null;
         isCurrentSessionAdmin = false;
@@ -8669,16 +8711,113 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
     let allWorkoutsList = [];
     const expandedWorkoutIds = new Set();
 
+    // ====================================================================
+    // FINGERPRINTING & COMPARATIVO DETERMINÍSTICO DE TREINOS (Etapa 2)
+    // ====================================================================
+    function normalizeWorkoutForComparison(workout) {
+      if (!workout) return null;
+      const exercises = Array.isArray(workout.exercicios) ? workout.exercicios : [];
+      const days = Array.isArray(workout.diasSemana) ? [...workout.diasSemana].sort() : [];
+      return {
+        id: String(workout.id || ''),
+        nome: String(workout.nome || '').trim(),
+        descricao: String(workout.descricao || '').trim(),
+        diasSemana: days,
+        corHex: String(workout.corHex || '').trim(),
+        updatedAt: String(workout.updated_at || workout.atualizado_em || workout.criadoEm || ''),
+        exercicios: exercises.map((e, idx) => ({
+          id: String(e.id || e.exercise_id || idx),
+          nome: String(e.nome || e.name || '').trim(),
+          series: String(e.series || ''),
+          reps: String(e.reps || ''),
+          descanso: Number(e.descanso || 0)
+        }))
+      };
+    }
+
+    function createWorkoutsFingerprint(workouts) {
+      if (!Array.isArray(workouts)) return '';
+      const normalized = workouts
+        .map(normalizeWorkoutForComparison)
+        .filter(Boolean)
+        .sort((a, b) => a.id.localeCompare(b.id));
+      return JSON.stringify(normalized);
+    }
+    window.normalizeWorkoutForComparison = normalizeWorkoutForComparison;
+    window.createWorkoutsFingerprint = createWorkoutsFingerprint;
+
+    // ====================================================================
+    // CONTROLE DE CONCORRÊNCIA DE SINCRONIZAÇÃO / MUTEX (Etapa 10)
+    // ====================================================================
+    let _workoutSyncPromise = null;
+
+    async function runWorkoutSyncOnce(task) {
+      if (_workoutSyncPromise) {
+        return _workoutSyncPromise;
+      }
+
+      _workoutSyncPromise = Promise.resolve()
+        .then(task)
+        .catch(err => {
+          console.warn('[Workout Sync Once Notice]:', err);
+        })
+        .finally(() => {
+          _workoutSyncPromise = null;
+        });
+
+      return _workoutSyncPromise;
+    }
+    window.runWorkoutSyncOnce = runWorkoutSyncOnce;
+
+    // ====================================================================
+    // CANAL ÚNICO E DEBOUNCE DO SUPABASE REALTIME (Etapas 5 e 6)
+    // ====================================================================
+    let _realtimeSyncUserId = null;
     let _realtimeSyncChannel = null;
+    let _realtimeRefreshTimer = null;
+
+    function scheduleRealtimeWorkoutRefresh() {
+      clearTimeout(_realtimeRefreshTimer);
+      _realtimeRefreshTimer = setTimeout(async () => {
+        await runWorkoutSyncOnce(async () => {
+          await loadWorkoutsFromStorage(true);
+        });
+      }, 500);
+    }
+
+    async function cleanupRealtimeSync() {
+      if (_realtimeRefreshTimer) {
+        clearTimeout(_realtimeRefreshTimer);
+        _realtimeRefreshTimer = null;
+      }
+      if (_realtimeSyncChannel && _supabase) {
+        try {
+          await _supabase.removeChannel(_realtimeSyncChannel);
+        } catch (_) {}
+      }
+      _realtimeSyncChannel = null;
+      _realtimeSyncUserId = null;
+    }
+    window.cleanupRealtimeSync = cleanupRealtimeSync;
 
     function setupSupabaseRealtimeSync(uid) {
       if (!_supabase || !uid) return;
-      try {
-        if (_realtimeSyncChannel) {
-          _supabase.removeChannel(_realtimeSyncChannel);
-          _realtimeSyncChannel = null;
-        }
 
+      // Proteção: não recriar canal se já estiver ativo para este mesmo usuário (Etapa 5)
+      if (_realtimeSyncChannel && _realtimeSyncUserId === uid) {
+        return;
+      }
+
+      if (_realtimeSyncChannel) {
+        try {
+          _supabase.removeChannel(_realtimeSyncChannel);
+        } catch (_) {}
+        _realtimeSyncChannel = null;
+      }
+
+      _realtimeSyncUserId = uid;
+
+      try {
         _realtimeSyncChannel = _supabase
           .channel(`titannova-sync-${uid}`)
           .on(
@@ -8688,12 +8827,11 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
               schema: 'public',
               table: 'treinos'
             },
-            async (payload) => {
+            (payload) => {
               const row = payload.new || payload.old;
               if (!row || row.usuario_id === uid || row.user_id === uid) {
-                console.log('[Supabase Realtime] Alteração detectada em treinos em outro aparelho:', payload.eventType);
-                await loadWorkoutsFromStorage(true);
-                updateHomeScreenUI();
+                console.log('[Supabase Realtime] Alteração detectada em treinos:', payload.eventType);
+                scheduleRealtimeWorkoutRefresh();
               }
             }
           )
@@ -8743,20 +8881,22 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       if (!_supabase || !uid) return;
 
       const now = Date.now();
-      if (now - _lastContinuousSync < 3000) return;
+      if (now - _lastContinuousSync < 4000) return;
       _lastContinuousSync = now;
 
-      try {
-        await TitanNovaOfflineSync.flushQueue(uid);
-        await loadWorkoutsFromStorage(true);
-        await loadHistoryFromStorage(true);
-        updateHomeScreenUI();
-        updateProfileUI();
-        if (typeof updateFavoriteButtons === 'function') updateFavoriteButtons();
-        if (typeof renderFavoriteExercisesTab === 'function') renderFavoriteExercisesTab();
-      } catch (e) {
-        console.warn('[Continuous Sync Background Notice]:', e);
-      }
+      await runWorkoutSyncOnce(async () => {
+        try {
+          await TitanNovaOfflineSync.flushQueue(uid);
+          await loadWorkoutsFromStorage(true);
+          await loadHistoryFromStorage(true);
+          updateHomeScreenUI();
+          updateProfileUI();
+          if (typeof updateFavoriteButtons === 'function') updateFavoriteButtons();
+          if (typeof renderFavoriteExercisesTab === 'function') renderFavoriteExercisesTab();
+        } catch (e) {
+          console.warn('[Continuous Sync Background Notice]:', e);
+        }
+      });
     }
 
     // Ouvintes contínuos de foco e atividade para qualquer aparelho (Mobile / Desktop / PWA)
@@ -8769,6 +8909,11 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       if (document.visibilityState === 'visible') triggerContinuousSync();
     }, 25000);
 
+    // ====================================================================
+    // CARREGAMENTO E RECONCILIAÇÃO SILENCIOSA DE TREINOS (Etapas 3 e 4)
+    // ====================================================================
+    let _workoutsInitialLoaded = false;
+
     async function loadWorkoutsFromStorage(silent = false) {
       const uid = getEffectiveUserId();
       loadDeletedWorkoutIds(uid);
@@ -8777,44 +8922,52 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
         try {
           const guestCached = JSON.parse(localStorage.getItem('titannovafit_custom_workouts') || '[]');
           if (Array.isArray(guestCached) && guestCached.length > 0) {
-            allWorkoutsList = guestCached.filter(w => w && w.id && !_deletedWorkoutIds.has(String(w.id)) && !_deletedWorkoutIds.has(String(w.nome)));
-            renderAllWorkoutsUI();
-            updateHomeScreenUI();
+            const nextGuest = guestCached.filter(w => w && w.id && !_deletedWorkoutIds.has(String(w.id)) && !_deletedWorkoutIds.has(String(w.nome)));
+            const curFp = createWorkoutsFingerprint(allWorkoutsList);
+            const nxtFp = createWorkoutsFingerprint(nextGuest);
+            if (curFp !== nxtFp) {
+              allWorkoutsList = nextGuest;
+              renderAllWorkoutsUI();
+              updateHomeScreenUI();
+            }
             return;
           }
         } catch (_) {}
-        allWorkoutsList = [];
-        renderAllWorkoutsUI();
+        if (allWorkoutsList.length > 0) {
+          allWorkoutsList = [];
+          renderAllWorkoutsUI();
+        }
         return;
       }
 
       const userStorageKey = `titannovafit_workouts_${uid}`;
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uid);
 
-      // 1. Carregar cache local rápido do usuário atual para exibição imediata
-      try {
-        const cached = localStorage.getItem(userStorageKey) || localStorage.getItem('titannovafit_custom_workouts');
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            // Filtrar itens excluídos pelo usuário
-            allWorkoutsList = parsed.filter(w => w && w.id && !_deletedWorkoutIds.has(String(w.id)) && !_deletedWorkoutIds.has(String(w.nome)));
-            renderAllWorkoutsUI();
-            updateHomeScreenUI();
-          } else if (Array.isArray(parsed) && parsed.length === 0) {
-            allWorkoutsList = [];
-            renderAllWorkoutsUI();
-            updateHomeScreenUI();
+      // 1. Carregar cache local rápido apenas no primeiro carregamento da tela (Etapa 3 - item 3)
+      if (!_workoutsInitialLoaded) {
+        try {
+          const cached = localStorage.getItem(userStorageKey) || localStorage.getItem('titannovafit_custom_workouts');
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              allWorkoutsList = parsed.filter(w => w && w.id && !_deletedWorkoutIds.has(String(w.id)) && !_deletedWorkoutIds.has(String(w.nome)));
+              renderAllWorkoutsUI();
+              updateHomeScreenUI();
+            } else if (Array.isArray(parsed) && parsed.length === 0) {
+              allWorkoutsList = [];
+              renderAllWorkoutsUI();
+              updateHomeScreenUI();
+            }
           }
-        }
-      } catch (_) {}
+        } catch (_) {}
+        _workoutsInitialLoaded = true;
+      }
 
-      // 2. Buscar no Supabase diretamente para a conta autenticada (sincronização contínua)
+      // 2. Buscar no Supabase silenciosamente
       if (_supabase) {
         try {
-          if (!silent) showSyncStatus('saving');
+          if (!silent) beginBackgroundSync();
           let data = null;
-          let error = null;
 
           const res1 = await _supabase.from('treinos').select('*').eq('usuario_id', uid).order('criado_em', { ascending: false });
           if (!res1.error && Array.isArray(res1.data) && res1.data.length > 0) {
@@ -8827,13 +8980,14 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
           }
 
           if (Array.isArray(data)) {
+            let nextWorkouts = [];
+
             if (data.length > 0) {
               const onlineWorkouts = data
                 .filter(row => {
                   if (!row || !row.id) return false;
                   const isDeleted = _deletedWorkoutIds.has(String(row.id)) || (row.nome && _deletedWorkoutIds.has(String(row.nome)));
                   if (isDeleted) {
-                    // Purga da nuvem em background se ainda estiver lá
                     if (_supabase) {
                       _supabase.from('treinos').delete().eq('id', row.id).catch(() => {});
                     }
@@ -8885,25 +9039,20 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
                   };
                 });
 
-              // FUSÃO INTELIGENTE: NUNCA RESSUSCITAR TREINOS EXCLUÍDOS
+              // FUSÃO INTELIGENTE
               const mergedMap = new Map();
-
-              // Primeiro: insere todos os treinos da nuvem válidos
               for (const ow of onlineWorkouts) {
                 if (ow && ow.id && !_deletedWorkoutIds.has(String(ow.id)) && !_deletedWorkoutIds.has(String(ow.nome))) {
                   mergedMap.set(ow.id, ow);
                 }
               }
 
-              // Segundo: preserva todos os treinos locais em memória não excluídos
               if (Array.isArray(allWorkoutsList)) {
                 for (const lw of allWorkoutsList) {
                   if (lw && lw.id && !_deletedWorkoutIds.has(String(lw.id)) && !_deletedWorkoutIds.has(String(lw.nome))) {
                     if (!mergedMap.has(lw.id)) {
-                      // Treino local ainda não subiu para a nuvem -> PRESERVA!
                       mergedMap.set(lw.id, lw);
                     } else {
-                      // Se na nuvem veio sem exercícios mas local tem, preserva os exercícios
                       const existing = mergedMap.get(lw.id);
                       if (existing && (!existing.exercicios || existing.exercicios.length === 0) && Array.isArray(lw.exercicios) && lw.exercicios.length > 0) {
                         existing.exercicios = lw.exercicios;
@@ -8914,7 +9063,6 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
                 }
               }
 
-              // Terceiro: verifica se no localStorage há treinos locais válidos não salvos ainda
               try {
                 const localSaved = JSON.parse(localStorage.getItem(userStorageKey) || '[]');
                 if (Array.isArray(localSaved)) {
@@ -8926,39 +9074,21 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
                 }
               } catch (_) {}
 
-              allWorkoutsList = Array.from(mergedMap.values());
-              localStorage.setItem(userStorageKey, JSON.stringify(allWorkoutsList));
-              localStorage.setItem('titannovafit_custom_workouts', JSON.stringify(allWorkoutsList));
-              renderAllWorkoutsUI();
-              updateHomeScreenUI();
-
-              // Se houver treinos locais não presentes na nuvem, dispara o envio em background
-              const unSynced = allWorkoutsList.filter(w => !onlineWorkouts.some(ow => ow.id === w.id));
-              if (unSynced.length > 0) {
-                saveWorkoutsToStorageAndCloud().catch(() => {});
-              }
+              nextWorkouts = Array.from(mergedMap.values());
             } else {
-              // Supabase não retornou treinos:
+              // Supabase não retornou treinos
               const wasInitialized = localStorage.getItem(`titannovafit_workouts_initialized_${uid}`) === 'true';
 
               if (Array.isArray(allWorkoutsList) && allWorkoutsList.length > 0) {
-                // Preserva os treinos locais e sobe para o banco
-                localStorage.setItem(userStorageKey, JSON.stringify(allWorkoutsList));
-                renderAllWorkoutsUI();
-                updateHomeScreenUI();
-                saveWorkoutsToStorageAndCloud().catch(() => {});
+                nextWorkouts = allWorkoutsList;
               } else if (!wasInitialized && _deletedWorkoutIds.size === 0) {
-                // Conta nova sem nenhum treino: inicializa os 4 padrões apenas UMA VEZ
                 localStorage.setItem(`titannovafit_workouts_initialized_${uid}`, 'true');
                 const defaultWorkoutsForUser = DEFAULT_WORKOUT_DIVISIONS.map(d => ({
                   ...d,
                   id: `treino_${uid.substring(0, 8)}_${d.id || Date.now()}`,
                   criadoEm: new Date().toISOString()
                 }));
-                allWorkoutsList = defaultWorkoutsForUser;
-                localStorage.setItem(userStorageKey, JSON.stringify(allWorkoutsList));
-                renderAllWorkoutsUI();
-                updateHomeScreenUI();
+                nextWorkouts = defaultWorkoutsForUser;
 
                 for (const localW of defaultWorkoutsForUser) {
                   try {
@@ -8976,32 +9106,40 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
                   } catch (_) {}
                 }
               } else {
-                // Usuário que apagou todos os treinos: manter lista vazia e não recriar padrões!
-                allWorkoutsList = [];
-                localStorage.setItem(userStorageKey, JSON.stringify([]));
-                localStorage.setItem('titannovafit_custom_workouts', JSON.stringify([]));
-                renderAllWorkoutsUI();
-                updateHomeScreenUI();
+                nextWorkouts = [];
               }
             }
+
+            // Comparar impressão digital antes de mutar estado ou DOM (Etapa 2 e 3)
+            const currentFingerprint = createWorkoutsFingerprint(allWorkoutsList);
+            const nextFingerprint = createWorkoutsFingerprint(nextWorkouts);
+
+            if (currentFingerprint !== nextFingerprint) {
+              allWorkoutsList = nextWorkouts;
+              localStorage.setItem(userStorageKey, JSON.stringify(allWorkoutsList));
+              localStorage.setItem('titannovafit_custom_workouts', JSON.stringify(allWorkoutsList));
+              renderAllWorkoutsUI();
+              updateHomeScreenUI();
+            }
           }
-          if (!silent) showSyncStatus('saved');
+
+          if (!silent) finishBackgroundSync('saved');
         } catch (e) {
           console.warn('[Supabase Sync Treinos Warning]:', e);
-          if (!silent) showSyncStatus('idle');
+          if (!silent) finishBackgroundSync('idle');
         }
       }
-      // Garantir que o canal Realtime esteja ativo para este usuário
-      setupSupabaseRealtimeSync(uid);
-      renderAllWorkoutsUI();
     }
 
+    // ====================================================================
+    // RENDERIZAÇÃO ESTÁVEL E ATUALIZAÇÃO CIRÚRGICA POR ID (Etapas 7 e 8)
+    // ====================================================================
     function toggleWorkoutCardExpand(workoutId, event) {
       if (event) event.stopPropagation();
       if (expandedWorkoutIds.has(workoutId)) {
         expandedWorkoutIds.delete(workoutId);
       } else {
-        expandedWorkoutIds.clear(); // Fecha qualquer outro treino aberto, garantindo foco APENAS no selecionado
+        expandedWorkoutIds.clear();
         expandedWorkoutIds.add(workoutId);
       }
       renderAllWorkoutsUI();
@@ -9016,11 +9154,130 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
       }
     }
 
-    function renderAllWorkoutsUI() {
+    function generateWorkoutCardHtml(w, isExpanded = false) {
+      const daysStr = Array.isArray(w.diasSemana) && w.diasSemana.length > 0 ? w.diasSemana.join(' • ') : 'Dias flexíveis';
+      const exercises = Array.isArray(w.exercicios) ? w.exercicios : [];
+      const count = exercises.length;
+
+      return `
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div style="flex: 1; min-width: 0;">
+            <h4 style="font-size: ${isExpanded ? '18px' : '16px'}; font-weight: 800; color: white; margin-bottom: 2px;">${escapeHtml(w.nome)}</h4>
+            <p style="font-size: 11px; color: var(--text-grey); margin: 0;">${escapeHtml(daysStr)}</p>
+            ${w.descricao ? `<span style="display: inline-block; background: rgba(0,210,255,0.12); color: var(--accent-cyan); font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; margin-top: 6px;">${escapeHtml(w.descricao)}</span>` : ''}
+          </div>
+          <div style="display: flex; gap: 4px; align-items: center;">
+            <button data-id="${escapeHtml(w.id)}" onclick="duplicateWorkout(this.dataset.id)" style="background: none; border: none; color: var(--accent-cyan); cursor: pointer; font-size: 15px; padding: 4px;" title="Duplicar treino (Clonar)">📑</button>
+            <button data-id="${escapeHtml(w.id)}" onclick="shareWorkoutWhatsApp(this.dataset.id)" style="background: none; border: none; color: #25D366; cursor: pointer; font-size: 15px; padding: 4px;" title="Compartilhar via WhatsApp">💬</button>
+            <button data-id="${escapeHtml(w.id)}" onclick="deleteWorkoutCard(this.dataset.id)" style="background: none; border: none; color: var(--error-red); cursor: pointer; font-size: 15px; padding: 4px;" title="Excluir treino">🗑️</button>
+          </div>
+        </div>
+
+        <!-- Botão para Expandir / Recolher Exercícios Montados -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--divider);">
+          <button data-id="${escapeHtml(w.id)}" onclick="toggleWorkoutCardExpand(this.dataset.id, event)" style="background: ${isExpanded ? 'rgba(0,210,255,0.15)' : 'none'}; border: ${isExpanded ? '1px solid var(--accent-cyan)' : 'none'}; border-radius: 6px; padding: ${isExpanded ? '4px 10px' : '0'}; font-size: 12px; font-weight: 700; color: var(--accent-cyan); cursor: pointer; display: flex; align-items: center; gap: 4px;">
+            <span>${isExpanded ? '▲ Ocultar Exercícios' : `▼ Ver Exercícios Montados (${count})`}</span>
+          </button>
+          <button data-id="${escapeHtml(w.id)}" onclick="startActiveWorkout(this.dataset.id)" class="btn btn-success" style="width: auto; padding: 7px 18px; font-size: 12px; font-weight: 800; border-radius: 8px;">
+            ▶ INICIAR
+          </button>
+        </div>
+
+        <!-- LISTA DE EXERCÍCIOS MONTADOS NESTE TREINO (EXPANSÍVEL) -->
+        ${isExpanded ? `
+          <div style="margin-top: 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px;">
+            ${exercises.length === 0 ? `
+              <div class="empty-workout-box" style="grid-column: 1 / -1; background: rgba(255,255,255,0.02); border: 1.5px dashed var(--divider); padding: 24px 16px; border-radius: 12px; text-align: center; margin-top: 6px;">
+                <div style="font-size: 28px; margin-bottom: 6px;">📋</div>
+                <div style="font-size: 13.5px; font-weight: 800; color: white; margin-bottom: 4px;">Este treino ainda não possui exercícios.</div>
+                <div style="font-size: 11.5px; color: var(--text-grey); margin-bottom: 14px;">Adicione a divisão padrão oficial da ExerciseDB ou escolha exercícios manualmente na biblioteca.</div>
+                <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+                  <button onclick="event.stopPropagation(); addDefaultExercisesToWorkout('${escapeHtml(w.id)}')" class="btn btn-primary" style="width: auto; padding: 7px 14px; font-size: 11.5px; font-weight: 800; border-radius: 8px;">
+                    ✨ Adicionar exercícios padrão
+                  </button>
+                  <button onclick="event.stopPropagation(); openManualExerciseSelector('${escapeHtml(w.id)}')" class="btn btn-outline" style="width: auto; padding: 7px 14px; font-size: 11.5px; font-weight: 700; border-radius: 8px;">
+                    🔍 Selecionar manualmente
+                  </button>
+                </div>
+              </div>
+            ` : `
+              ${exercises.map((ex, idx) => {
+                const icon = getMuscleGroupIcon(ex.grupoMuscular);
+                let gifUrl = ex.gifUrl || ex.gif_url || '';
+                if (!gifUrl) {
+                  const match = DEFAULT_BASE_EXERCISES.find(b => (b.nome || b.name || '').toLowerCase() === (ex.nome || '').toLowerCase()) ||
+                                exercisesList.find(e => (e.nome || e.name || '').toLowerCase() === (ex.nome || '').toLowerCase());
+                  if (match) {
+                    gifUrl = match.gifUrl || match.gif_url || '';
+                  }
+                }
+
+                return `
+                  <div class="workout-exercise-row" style="background: #080a0f; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--divider); display: flex; flex-direction: column; gap: 10px; box-shadow: 0 4px 14px rgba(0,0,0,0.3);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                      <div data-name="${escapeHtml(ex.nome || 'Exercício')}" onclick="event.stopPropagation(); openOnlyGifModal(this.dataset.name)" style="display: flex; align-items: center; gap: 10px; min-width: 0; cursor: pointer; flex: 1;" title="Toque para ver animação ampliada com zoom 3D">
+                        <span style="font-size: 18px;">${icon}</span>
+                        <div style="min-width: 0;">
+                          <div style="font-size: 13.5px; font-weight: 700; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${idx + 1}. ${escapeHtml(ex.nome)}</div>
+                          <div style="font-size: 11px; color: var(--accent-cyan); font-weight: 600; margin-top: 2px;">${ex.series || 3} séries • ${ex.reps || '8-12'} reps • ${ex.descanso || 60}s descanso</div>
+                        </div>
+                      </div>
+                      <button data-name="${escapeHtml(ex.nome || 'Exercício')}" onclick="event.stopPropagation(); openOnlyGifModal(this.dataset.name)" style="background: rgba(0,210,255,0.12); border: 1px solid rgba(0,210,255,0.4); color: var(--accent-cyan); font-size: 11px; font-weight: 800; padding: 5px 10px; border-radius: 6px; cursor: pointer; flex-shrink: 0;" title="Ver demonstração animada">
+                        🔍 GIF 3D
+                      </button>
+                    </div>
+
+                    <!-- Barra de Ações por Exercício (Subir, Descer, Editar, Substituir, Remover) -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 11px;">
+                      <div style="display: flex; gap: 4px; align-items: center;">
+                        <button data-id="${escapeHtml(w.id)}" data-index="${idx}" onclick="event.stopPropagation(); reorderWorkoutExercise(this.dataset.id, parseInt(this.dataset.index), -1)" ${idx === 0 ? 'disabled' : ''} class="btn-micro" title="Mover para cima">
+                          ⬆️
+                        </button>
+                        <button data-id="${escapeHtml(w.id)}" data-index="${idx}" onclick="event.stopPropagation(); reorderWorkoutExercise(this.dataset.id, parseInt(this.dataset.index), 1)" ${idx === exercises.length - 1 ? 'disabled' : ''} class="btn-micro" title="Mover para baixo">
+                          ⬇️
+                        </button>
+                      </div>
+                      <div style="display: flex; gap: 6px; align-items: center;">
+                        <button data-id="${escapeHtml(w.id)}" data-index="${idx}" onclick="event.stopPropagation(); editWorkoutExerciseParams(this.dataset.id, parseInt(this.dataset.index))" style="background: none; border: none; color: #d0d4dc; cursor: pointer; font-size: 11px; font-weight: 700; padding: 3px 6px;" title="Editar séries, repetições e descanso">
+                          ✏️ Editar
+                        </button>
+                        <button data-id="${escapeHtml(w.id)}" data-index="${idx}" onclick="event.stopPropagation(); replaceWorkoutExercise(this.dataset.id, parseInt(this.dataset.index))" style="background: none; border: none; color: var(--accent-cyan); cursor: pointer; font-size: 11px; font-weight: 700; padding: 3px 6px;" title="Substituir por outro exercício">
+                          🔄 Substituir
+                        </button>
+                        <button data-id="${escapeHtml(w.id)}" data-index="${idx}" onclick="event.stopPropagation(); removeWorkoutExercise(this.dataset.id, parseInt(this.dataset.index))" style="background: none; border: none; color: var(--error-red); cursor: pointer; font-size: 11px; font-weight: 700; padding: 3px 6px;" title="Remover exercício">
+                          🗑️ Remover
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+
+              <!-- Ações Inferiores da Lista de Exercícios -->
+              <div style="grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--divider); flex-wrap: wrap; gap: 8px;">
+                <button onclick="event.stopPropagation(); openManualExerciseSelector('${escapeHtml(w.id)}')" style="background: rgba(0,210,255,0.08); border: 1px dashed rgba(0,210,255,0.4); color: var(--accent-cyan); font-size: 11px; font-weight: 700; padding: 6px 12px; border-radius: 6px; cursor: pointer;">
+                  + Adicionar Mais Exercícios
+                </button>
+                <button onclick="event.stopPropagation(); clearWorkoutExercises('${escapeHtml(w.id)}')" style="background: none; border: none; color: var(--text-grey); font-size: 11px; cursor: pointer;">
+                  🗑️ Limpar exercícios padrão
+                </button>
+              </div>
+
+              <!-- Aviso Obrigatório de Saúde e Segurança -->
+              <div style="grid-column: 1 / -1; background: rgba(0,210,255,0.05); border: 1px solid rgba(0,210,255,0.2); border-radius: 8px; padding: 10px 14px; margin-top: 6px; font-size: 11px; color: var(--text-grey); line-height: 1.4;">
+                ⚠️ <strong>Aviso de Saúde e Segurança:</strong> Este é um modelo geral de organização, não uma prescrição individual. Ajuste com orientação qualificada e interrompa o exercício em caso de dor ou mal-estar.
+              </div>
+            `}
+          </div>
+        ` : ''}
+      `;
+    }
+
+    function patchWorkoutCards(nextWorkouts) {
       const container = document.getElementById('workoutListContainer');
       if (!container) return;
 
-      if (allWorkoutsList.length === 0) {
+      if (!Array.isArray(nextWorkouts) || nextWorkouts.length === 0) {
         container.innerHTML = `
           <div style="text-align: center; padding: 35px 16px; color: var(--text-grey);">
             <div style="font-size: 36px; margin-bottom: 8px;">🏋️‍♂️</div>
@@ -9032,132 +9289,64 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
         return;
       }
 
-      container.innerHTML = allWorkoutsList.map(w => {
+      // Se havia aviso de lista vazia no container, limpa antes de inserir cartões
+      if (container.firstElementChild && !container.firstElementChild.id?.startsWith('card_')) {
+        container.innerHTML = '';
+      }
+
+      const nextIds = new Set(nextWorkouts.map(w => String(w.id)));
+
+      // 1. Remover apenas os cartões que não estão mais presentes
+      container.querySelectorAll('[data-workout-id]').forEach(card => {
+        const cardId = card.getAttribute('data-workout-id') || card.id.replace(/^card_/, '');
+        if (!nextIds.has(cardId)) {
+          card.remove();
+        }
+      });
+
+      // 2. Atualizar cirurgicamente cartões existentes ou inserir novos
+      nextWorkouts.forEach(w => {
+        const id = String(w.id);
         const isExpanded = expandedWorkoutIds.has(w.id);
-        const daysStr = Array.isArray(w.diasSemana) && w.diasSemana.length > 0 ? w.diasSemana.join(' • ') : 'Dias flexíveis';
-        const exercises = Array.isArray(w.exercicios) ? w.exercicios : [];
-        const count = exercises.length;
-        const color = w.corHex || '#1E88E5';
+        const cardHtml = generateWorkoutCardHtml(w, isExpanded);
+        const existingCard = document.getElementById(`card_${id}`) || container.querySelector(`[data-workout-id="${CSS.escape(id)}"]`);
 
-        return `
-          <div class="card ${isExpanded ? 'workout-card-expanded' : ''}" id="card_${w.id}" style="border-left: 5px solid ${color}; padding: ${isExpanded ? '20px 22px' : '16px'}; animation: fadeIn 0.25s ease-in-out; ${isExpanded ? 'grid-column: 1 / -1; z-index: 5;' : ''}">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-              <div style="flex: 1; min-width: 0;">
-                <h4 style="font-size: ${isExpanded ? '18px' : '16px'}; font-weight: 800; color: white; margin-bottom: 2px;">${escapeHtml(w.nome)}</h4>
-                <p style="font-size: 11px; color: var(--text-grey); margin: 0;">${escapeHtml(daysStr)}</p>
-                ${w.descricao ? `<span style="display: inline-block; background: rgba(0,210,255,0.12); color: var(--accent-cyan); font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; margin-top: 6px;">${escapeHtml(w.descricao)}</span>` : ''}
-              </div>
-              <div style="display: flex; gap: 4px; align-items: center;">
-                <button data-id="${escapeHtml(w.id)}" onclick="duplicateWorkout(this.dataset.id)" style="background: none; border: none; color: var(--accent-cyan); cursor: pointer; font-size: 15px; padding: 4px;" title="Duplicar treino (Clonar)">📑</button>
-                <button data-id="${escapeHtml(w.id)}" onclick="shareWorkoutWhatsApp(this.dataset.id)" style="background: none; border: none; color: #25D366; cursor: pointer; font-size: 15px; padding: 4px;" title="Compartilhar via WhatsApp">💬</button>
-                <button data-id="${escapeHtml(w.id)}" onclick="deleteWorkoutCard(this.dataset.id)" style="background: none; border: none; color: var(--error-red); cursor: pointer; font-size: 15px; padding: 4px;" title="Excluir treino">🗑️</button>
-              </div>
-            </div>
+        if (existingCard) {
+          existingCard.setAttribute('data-workout-id', id);
+          existingCard.className = `card workout-card ${isExpanded ? 'workout-card-expanded' : ''}`;
+          existingCard.style.borderLeft = `5px solid ${w.corHex || '#1E88E5'}`;
+          existingCard.style.padding = isExpanded ? '20px 22px' : '16px';
+          if (isExpanded) {
+            existingCard.style.gridColumn = '1 / -1';
+            existingCard.style.zIndex = '5';
+          } else {
+            existingCard.style.gridColumn = '';
+            existingCard.style.zIndex = '';
+          }
+          if (existingCard.innerHTML !== cardHtml) {
+            existingCard.innerHTML = cardHtml;
+          }
+          container.appendChild(existingCard);
+        } else {
+          const newCard = document.createElement('div');
+          newCard.id = `card_${id}`;
+          newCard.setAttribute('data-workout-id', id);
+          newCard.className = `card workout-card is-new ${isExpanded ? 'workout-card-expanded' : ''}`;
+          newCard.style.borderLeft = `5px solid ${w.corHex || '#1E88E5'}`;
+          newCard.style.padding = isExpanded ? '20px 22px' : '16px';
+          if (isExpanded) {
+            newCard.style.gridColumn = '1 / -1';
+            newCard.style.zIndex = '5';
+          }
+          newCard.innerHTML = cardHtml;
+          newCard.addEventListener('animationend', () => newCard.classList.remove('is-new'), { once: true });
+          container.appendChild(newCard);
+        }
+      });
+    }
 
-            <!-- Botão para Expandir / Recolher Exercícios Montados -->
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--divider);">
-              <button data-id="${escapeHtml(w.id)}" onclick="toggleWorkoutCardExpand(this.dataset.id, event)" style="background: ${isExpanded ? 'rgba(0,210,255,0.15)' : 'none'}; border: ${isExpanded ? '1px solid var(--accent-cyan)' : 'none'}; border-radius: 6px; padding: ${isExpanded ? '4px 10px' : '0'}; font-size: 12px; font-weight: 700; color: var(--accent-cyan); cursor: pointer; display: flex; align-items: center; gap: 4px;">
-                <span>${isExpanded ? '▲ Ocultar Exercícios' : `▼ Ver Exercícios Montados (${count})`}</span>
-              </button>
-              <button data-id="${escapeHtml(w.id)}" onclick="startActiveWorkout(this.dataset.id)" class="btn btn-success" style="width: auto; padding: 7px 18px; font-size: 12px; font-weight: 800; border-radius: 8px;">
-                ▶ INICIAR
-              </button>
-            </div>
-
-            <!-- LISTA DE EXERCÍCIOS MONTADOS NESTE TREINO (EXPANSÍVEL) -->
-            ${isExpanded ? `
-              <div style="margin-top: 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; animation: fadeIn 0.25s ease-in-out;">
-                ${exercises.length === 0 ? `
-                  <div class="empty-workout-box" style="grid-column: 1 / -1; background: rgba(255,255,255,0.02); border: 1.5px dashed var(--divider); padding: 24px 16px; border-radius: 12px; text-align: center; margin-top: 6px;">
-                    <div style="font-size: 28px; margin-bottom: 6px;">📋</div>
-                    <div style="font-size: 13.5px; font-weight: 800; color: white; margin-bottom: 4px;">Este treino ainda não possui exercícios.</div>
-                    <div style="font-size: 11.5px; color: var(--text-grey); margin-bottom: 14px;">Adicione a divisão padrão oficial da ExerciseDB ou escolha exercícios manualmente na biblioteca.</div>
-                    <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
-                      <button onclick="event.stopPropagation(); addDefaultExercisesToWorkout('${w.id}')" class="btn btn-primary" style="width: auto; padding: 7px 14px; font-size: 11.5px; font-weight: 800; border-radius: 8px;">
-                        ✨ Adicionar exercícios padrão
-                      </button>
-                      <button onclick="event.stopPropagation(); openManualExerciseSelector('${w.id}')" class="btn btn-outline" style="width: auto; padding: 7px 14px; font-size: 11.5px; font-weight: 700; border-radius: 8px;">
-                        🔍 Selecionar manualmente
-                      </button>
-                    </div>
-                  </div>
-                ` : `
-                  ${exercises.map((ex, idx) => {
-                    const icon = getMuscleGroupIcon(ex.grupoMuscular);
-                    const safeName = (ex.nome || 'Exercício').replace(/'/g, "\\'");
-                    const safeSubtitle = `${ex.grupoMuscular || 'Geral'} • ${ex.series || 3} séries x ${ex.reps || '8-12'} reps • ${ex.descanso || 60}s descanso`;
-
-                    let gifUrl = ex.gifUrl || ex.gif_url || '';
-                    if (!gifUrl) {
-                      const match = DEFAULT_BASE_EXERCISES.find(b => (b.nome || b.name || '').toLowerCase() === (ex.nome || '').toLowerCase()) ||
-                                    exercisesList.find(e => (e.nome || e.name || '').toLowerCase() === (ex.nome || '').toLowerCase());
-                      if (match) {
-                        gifUrl = match.gifUrl || match.gif_url || '';
-                      }
-                    }
-
-                    return `
-                      <div class="workout-exercise-row" style="background: #080a0f; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--divider); display: flex; flex-direction: column; gap: 10px; box-shadow: 0 4px 14px rgba(0,0,0,0.3);">
-                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
-                          <div data-name="${escapeHtml(ex.nome || 'Exercício')}" onclick="event.stopPropagation(); openOnlyGifModal(this.dataset.name)" style="display: flex; align-items: center; gap: 10px; min-width: 0; cursor: pointer; flex: 1;" title="Toque para ver animação ampliada com zoom 3D">
-                            <span style="font-size: 18px;">${icon}</span>
-                            <div style="min-width: 0;">
-                              <div style="font-size: 13.5px; font-weight: 700; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${idx + 1}. ${escapeHtml(ex.nome)}</div>
-                              <div style="font-size: 11px; color: var(--accent-cyan); font-weight: 600; margin-top: 2px;">${ex.series || 3} séries • ${ex.reps || '8-12'} reps • ${ex.descanso || 60}s descanso</div>
-                            </div>
-                          </div>
-                          <button data-name="${escapeHtml(ex.nome || 'Exercício')}" onclick="event.stopPropagation(); openOnlyGifModal(this.dataset.name)" style="background: rgba(0,210,255,0.12); border: 1px solid rgba(0,210,255,0.4); color: var(--accent-cyan); font-size: 11px; font-weight: 800; padding: 5px 10px; border-radius: 6px; cursor: pointer; flex-shrink: 0;" title="Ver demonstração animada">
-                            🔍 GIF 3D
-                          </button>
-                        </div>
-
-                        <!-- Barra de Ações por Exercício (Subir, Descer, Editar, Substituir, Remover) -->
-                        <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 11px;">
-                          <div style="display: flex; gap: 4px; align-items: center;">
-                            <button data-id="${escapeHtml(w.id)}" data-index="${idx}" onclick="event.stopPropagation(); reorderWorkoutExercise(this.dataset.id, parseInt(this.dataset.index), -1)" ${idx === 0 ? 'disabled' : ''} class="btn-micro" title="Mover para cima">
-                              ⬆️
-                            </button>
-                            <button data-id="${escapeHtml(w.id)}" data-index="${idx}" onclick="event.stopPropagation(); reorderWorkoutExercise(this.dataset.id, parseInt(this.dataset.index), 1)" ${idx === exercises.length - 1 ? 'disabled' : ''} class="btn-micro" title="Mover para baixo">
-                              ⬇️
-                            </button>
-                          </div>
-                          <div style="display: flex; gap: 6px; align-items: center;">
-                            <button data-id="${escapeHtml(w.id)}" data-index="${idx}" onclick="event.stopPropagation(); editWorkoutExerciseParams(this.dataset.id, parseInt(this.dataset.index))" style="background: none; border: none; color: #d0d4dc; cursor: pointer; font-size: 11px; font-weight: 700; padding: 3px 6px;" title="Editar séries, repetições e descanso">
-                              ✏️ Editar
-                            </button>
-                            <button data-id="${escapeHtml(w.id)}" data-index="${idx}" onclick="event.stopPropagation(); replaceWorkoutExercise(this.dataset.id, parseInt(this.dataset.index))" style="background: none; border: none; color: var(--accent-cyan); cursor: pointer; font-size: 11px; font-weight: 700; padding: 3px 6px;" title="Substituir por outro exercício">
-                              🔄 Substituir
-                            </button>
-                            <button data-id="${escapeHtml(w.id)}" data-index="${idx}" onclick="event.stopPropagation(); removeWorkoutExercise(this.dataset.id, parseInt(this.dataset.index))" style="background: none; border: none; color: var(--error-red); cursor: pointer; font-size: 11px; font-weight: 700; padding: 3px 6px;" title="Remover exercício">
-                              🗑️ Remover
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    `;
-                  }).join('')}
-
-                  <!-- Ações Inferiores da Lista de Exercícios -->
-                  <div style="grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--divider); flex-wrap: wrap; gap: 8px;">
-                    <button onclick="event.stopPropagation(); openManualExerciseSelector('${w.id}')" style="background: rgba(0,210,255,0.08); border: 1px dashed rgba(0,210,255,0.4); color: var(--accent-cyan); font-size: 11px; font-weight: 700; padding: 6px 12px; border-radius: 6px; cursor: pointer;">
-                      + Adicionar Mais Exercícios
-                    </button>
-                    <button onclick="event.stopPropagation(); clearWorkoutExercises('${w.id}')" style="background: none; border: none; color: var(--text-grey); font-size: 11px; cursor: pointer;">
-                      🗑️ Limpar exercícios padrão
-                    </button>
-                  </div>
-
-                  <!-- Aviso Obrigatório de Saúde e Segurança -->
-                  <div style="grid-column: 1 / -1; background: rgba(0,210,255,0.05); border: 1px solid rgba(0,210,255,0.2); border-radius: 8px; padding: 10px 14px; margin-top: 6px; font-size: 11px; color: var(--text-grey); line-height: 1.4;">
-                    ⚠️ <strong>Aviso de Saúde e Segurança:</strong> Este é um modelo geral de organização, não uma prescrição individual. Ajuste com orientação qualificada e interrompa o exercício em caso de dor ou mal-estar.
-                  </div>
-                `}
-              </div>
-            ` : ''}
-
-          </div>
-        `;
-      }).join('');
+    function renderAllWorkoutsUI() {
+      patchWorkoutCards(allWorkoutsList);
     }
 
     async function deleteWorkoutCard(workoutId) {
