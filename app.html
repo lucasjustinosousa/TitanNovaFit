@@ -14202,6 +14202,7 @@ CREATE POLICY "Permitir leitura de usuarios para admin e autenticados" ON public
                 currentAuthUser = null;
                 isCurrentSessionAdmin = false;
                 localStorage.removeItem('titannovafit_user');
+                if (typeof cleanupRealtimeSync === 'function') cleanupRealtimeSync().catch(() => {});
                 setAuthStatus('unauthenticated');
               }
             });
